@@ -200,3 +200,20 @@ model Utilisation {
   createdAt     DateTime @default(now())
   updatedAt     DateTime @updatedAt
 }
+
+// ─── INVOICES ──────────────────────────────────────────────────
+
+model Invoice {
+  id            String   @id @default(uuid())
+  invoiceNumber String   @unique
+  direction     String   // INBOUND, OUTBOUND
+  vertical      String   // TRAINING, CSP, SDC, FUND_RAISING, TBB, SECRETARIAT, FINANCE
+  amount        Float
+  status        String   @default("ISSUED") // ISSUED, PAID, CANCELLED, SANCTIONED
+  issuedTo      String?  // Student, Vendor, or Entity Name
+  description   String
+  dueDate       DateTime?
+  referenceId   String?  // Link to StudentPayment, Utilisation, etc.
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+}

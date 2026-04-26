@@ -16,6 +16,7 @@ const bankRoutes = require('./routes/bank.routes');
 const reportRoutes = require('./routes/report.routes');
 const studentPaymentRoutes = require('./routes/studentPayment.routes');
 const utilisationRoutes = require('./routes/utilisation.routes');
+const invoiceRoutes = require('./routes/invoice.routes');
 
 const app = express();
 
@@ -38,6 +39,7 @@ app.use('/api/finance/bank', bankRoutes);
 app.use('/api/finance/reports', reportRoutes);
 app.use('/api/finance/student-payments', studentPaymentRoutes);
 app.use('/api/finance/utilisations', utilisationRoutes);
+app.use('/api/finance/invoices', invoiceRoutes);
 
 // ─── Health Check ────────────────────────────────────────────
 app.get('/api/health', (req, res) => {

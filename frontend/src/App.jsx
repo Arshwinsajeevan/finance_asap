@@ -15,6 +15,7 @@ import AdminDashboard from './pages/AdminDashboard';
 import StudentPaymentsPage from './pages/StudentPaymentsPage';
 import RefundsPage from './pages/RefundsPage';
 import UtilisationPage from './pages/UtilisationPage';
+import InvoicesPage from './pages/InvoicesPage';
 
 // Placeholder components for routes not yet implemented
 const PlaceholderPage = ({ title }) => (
@@ -61,6 +62,7 @@ const AppRoutes = () => {
         <Route path="bank" element={<BankRecordsPage />} />
         <Route path="fee-collections" element={<StudentPaymentsPage />} />
         <Route path="refunds" element={<RefundsPage />} />
+        <Route path="invoices" element={<InvoicesPage />} />
         <Route path="reports" element={<ReportsPage />} />
       </Route>
 

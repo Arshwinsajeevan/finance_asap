@@ -12,7 +12,8 @@ import {
   LogOut,
   GraduationCap,
   ClipboardCheck,
-  RefreshCcw
+  RefreshCcw,
+  Receipt
 } from 'lucide-react';
 
 const SidebarItem = ({ to, icon: Icon, label }) => (
@@ -47,7 +48,9 @@ const DashboardLayout = () => {
       {/* Sidebar */}
       <aside className="w-64 bg-white flex flex-col shadow-md z-10">
         <div className="p-6 border-b border-gray-100 flex items-center justify-center">
-          <img src="/asap-logo.png" alt="ASAP Kerala Logo" className="h-12 object-contain" />
+          <img src="/kerala-logo.png" alt="Kerala Govt Logo" className="h-14 w-auto object-contain mr-3" />
+          <div className="h-10 w-px bg-slate-200"></div>
+          <img src="/asap-logo.png" alt="ASAP Kerala Logo" className="h-10 w-auto object-contain ml-3" />
         </div>
         
         <div className="p-6 border-b border-gray-100 flex items-center space-x-4">
@@ -74,6 +77,7 @@ const DashboardLayout = () => {
           <SidebarItem to="/bank" icon={Landmark} label="Bank Records" />
           <SidebarItem to="/fee-collections" icon={GraduationCap} label="Fee Collections" />
           <SidebarItem to="/refunds" icon={RefreshCcw} label="Refunds" />
+          <SidebarItem to="/invoices" icon={Receipt} label="Invoices" />
           <SidebarItem to="/reports" icon={FileText} label="Financial Reports" />
         </nav>
 
