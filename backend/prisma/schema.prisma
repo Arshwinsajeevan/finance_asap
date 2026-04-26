@@ -1,0 +1,202 @@
+// ASAP Kerala Finance Module — Database Schema
+// Centralized finance system serving all verticals
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "sqlite"
+  url      = env("DATABASE_URL")
+}
+
+// ─── USERS & AUTH ────────────────────────────────────────────
+
+model User {
+  id        String   @id @default(uuid())
+  name      String
+  email     String   @unique
+  password  String
+  role      String   @default("VERTICAL_USER") // FINANCE_OFFICER, ADMIN, VERTICAL_USER, STUDENT
+  vertical  String?  // Which vertical this user belongs to (null for finance officers)
+  phone     String?
+  active    Boolean  @default(true)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  // Relations
+  transactions     Transaction[]
+  requisitions     Requisition[]     @relation("RaisedBy")
+  approvedRequests Requisition[]     @relation("ApprovedBy")
+  salaryRecords    Salary[]
+  studentPayments  StudentPayment[]
+  auditLogs        AuditLog[]
+  submittedUtilisations Utilisation[] @relation()
+  verifiedUtilisations  Utilisation[] @relation("VerifiedBy")
+}
+
+// ─── TRANSACTIONS ────────────────────────────────────────────
+
+model Transaction {
+  id              String   @id @default(uuid())
+  transactionType String   // STUDENT_PAYMENT, DONOR_FUND, SALARY, EXPENSE, FUND_RELEASE, REFUND
+  source          String   // TRAINING, CSP, SDC, FUND_RAISING, TBB, SECRETARIAT, FINANCE
+  amount          Float
+  description     String?
+  reference       String?  // External reference number
+  status          String   @default("SUCCESS") // SUCCESS, FAILED, PENDING
+  userId          String?
+  user            User?    @relation(fields: [userId], references: [id])
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+}
+
+// ─── REQUISITIONS ────────────────────────────────────────────
+
+model Requisition {
+  id            String   @id @default(uuid())
+  vertical      String   // TRAINING, CSP, SDC, FUND_RAISING, TBB, SECRETARIAT
+  amount        Float
+  purpose       String
+  description   String?
+  financialYear String   // e.g. "2025-26"
+  status        String   @default("PENDING") // PENDING, APPROVED, REJECTED, FUNDS_RELEASED
+  rejectionNote String?
+  approvedAmount Float?
+  releasedAmount Float?  // Amount actually released (can be partial)
+
+  raisedById    String
+  raisedBy      User     @relation("RaisedBy", fields: [raisedById], references: [id])
+  approvedById  String?
+  approvedBy    User?    @relation("ApprovedBy", fields: [approvedById], references: [id])
+
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+
+  utilisations  Utilisation[]
+}
+
+// ─── BUDGET ──────────────────────────────────────────────────
+
+model Budget {
+  id            String   @id @default(uuid())
+  vertical      String   // TRAINING, CSP, SDC, FUND_RAISING, TBB, SECRETARIAT
+  financialYear String   // e.g. "2025-26"
+  allocated     Float    @default(0)
+  used          Float    @default(0)
+  released      Float    @default(0)
+  description   String?
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+
+  @@unique([vertical, financialYear])
+}
+
+// ─── SALARIES & PAYOUTS ──────────────────────────────────────
+
+model Salary {
+  id            String   @id @default(uuid())
+  employeeType  String   // EMPLOYEE, TRAINER, MENTOR, AGENT
+  employeeName  String
+  employeeId    String?  // Reference to HR system
+  vertical      String?
+  amount        Float
+  month         String   // e.g. "2026-04"
+  status        String   @default("PENDING") // PENDING, PAID, FAILED
+  paymentDate   DateTime?
+  reference     String?  // Payment reference number
+  commission    Float?   // For agents — per enrolment commission
+
+  userId        String?
+  user          User?    @relation(fields: [userId], references: [id])
+
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+}
+
+// ─── DONOR FUNDS ─────────────────────────────────────────────
+
+model DonorFund {
+  id          String   @id @default(uuid())
+  donorName   String
+  donorType   String   @default("INDIVIDUAL") // INDIVIDUAL, CORPORATE, GOVERNMENT, SPONSORSHIP
+  amount      Float
+  vertical    String?  // Which vertical this fund is for
+  project     String?  // Specific project name
+  purpose     String?
+  reference   String?  // Receipt / acknowledgement number
+  receivedAt  DateTime @default(now())
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+}
+
+// ─── BANK RECORDS ────────────────────────────────────────────
+
+model BankRecord {
+  id          String   @id @default(uuid())
+  entryType   String   // STATEMENT, EMD, BANK_GUARANTEE, FD, OTHER
+  bankName    String?
+  accountNo   String?
+  amount      Float
+  description String?
+  reference   String?  // Document / tender reference
+  validFrom   DateTime?
+  validUntil  DateTime?
+  status      String   @default("ACTIVE") // ACTIVE, EXPIRED, RELEASED, FORFEITED
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+}
+
+// ─── STUDENT PAYMENTS ────────────────────────────────────────
+
+model StudentPayment {
+  id              String   @id @default(uuid())
+  studentId       String
+  student         User     @relation(fields: [studentId], references: [id])
+  courseName      String
+  totalFee        Float
+  paidAmount      Float    @default(0)
+  installmentNo   Int      @default(1)
+  paymentType     String   @default("FEE") // FEE, INSTALLMENT, REFUND
+  status          String   @default("PENDING") // PENDING, PAID, PARTIAL, REFUNDED
+  paidAt          DateTime?
+  reference       String?  // Payment gateway reference
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+}
+
+// ─── AUDIT LOG ───────────────────────────────────────────────
+
+model AuditLog {
+  id          String   @id @default(uuid())
+  action      String   // CREATE, UPDATE, APPROVE, REJECT, DELETE
+  entity      String   // Transaction, Requisition, Budget, etc.
+  entityId    String
+  details     String?  // JSON string of changes
+  performedBy String
+  user        User     @relation(fields: [performedBy], references: [id])
+  createdAt   DateTime @default(now())
+}
+
+// ─── UTILISATIONS ──────────────────────────────────────────────
+
+model Utilisation {
+  id            String   @id @default(uuid())
+  requisitionId String
+  requisition   Requisition @relation(fields: [requisitionId], references: [id])
+  vertical      String
+  amount        Float
+  description   String
+  billNo        String?
+  status        String   @default("PENDING") // PENDING, VERIFIED, REJECTED
+  rejectionNote String?
+  
+  submittedById String
+  submittedBy   User     @relation(fields: [submittedById], references: [id])
+  
+  verifiedById  String?
+  verifiedBy    User?    @relation("VerifiedBy", fields: [verifiedById], references: [id])
+
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+}

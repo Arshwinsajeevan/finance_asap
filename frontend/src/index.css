@@ -1,0 +1,64 @@
+@import "tailwindcss";
+
+@theme {
+  --color-primary-500: #00B4D8;
+  --color-primary-600: #0096B7;
+  --color-primary-700: #007A96;
+  --color-accent: #FF6900;
+  --color-surface: #F8FAFB;
+  --color-slate-800: #1E293B;
+  --color-slate-900: #0F172A;
+  --color-divider: #E2E8F0;
+
+  --font-sans: 'Inter', system-ui, -apple-system, sans-serif;
+}
+
+body {
+  background-color: var(--color-surface);
+  color: var(--color-slate-800);
+  font-family: var(--font-sans);
+}
+
+@layer components {
+  .btn-primary {
+    background-color: var(--color-primary-500);
+    color: #FFFFFF;
+    padding: 10px 20px;
+    border-radius: 12px;
+    font-weight: 500;
+    transition: all 0.3s ease;
+    box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+  }
+  
+  .btn-primary:hover {
+    background-color: var(--color-primary-600);
+    box-shadow: 0 4px 6px rgba(0, 180, 216, 0.25);
+  }
+
+  .card-premium {
+    background: #FFFFFF;
+    border-radius: 16px; /* rounded-2xl */
+    box-shadow: 0 4px 6px -1px rgba(0,0,0,0.05), 0 2px 4px -1px rgba(0,0,0,0.03); /* subtle shadow */
+    transition: transform 0.3s ease, box-shadow 0.3s ease;
+  }
+  
+  .card-premium:hover {
+    box-shadow: 0 10px 15px -3px rgba(0,0,0,0.08), 0 4px 6px -2px rgba(0,0,0,0.04);
+  }
+
+  .input-field {
+    width: 100%;
+    padding: 10px 16px;
+    border-radius: 12px;
+    border: 1px solid #E2E8F0;
+    background-color: #F8FAFB;
+    outline: none;
+    transition: border-color 0.2s, background-color 0.2s;
+  }
+  
+  .input-field:focus {
+    background-color: #FFFFFF;
+    border-color: var(--color-primary-500);
+    box-shadow: 0 0 0 3px rgba(0, 180, 216, 0.15);
+  }
+}

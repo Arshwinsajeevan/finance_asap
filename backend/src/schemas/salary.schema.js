@@ -1,0 +1,19 @@
+const { z } = require('zod');
+const config = require('../config');
+
+const createSalarySchema = z.object({
+  employeeType: z.enum(config.SALARY_TYPES, {
+    errorMap: () => ({ message: `Must be one of: ${config.SALARY_TYPES.join(', ')}` }),
+  }),
+  employeeName: z.string().min(2, 'Employee name is required'),
+  employeeId: z.string().optional(),
+  vertical: z.enum(config.VERTICALS).optional(),
+  amount: z.number().positive('Amount must be positive'),
+  month: z.string().regex(/^\d{4}-\d{2}$/, 'Month format must be YYYY-MM'),
+  status: z.enum(['PENDING', 'PAID', 'FAILED']).optional().default('PENDING'),
+  reference: z.string().optional(),
+  commission: z.number().min(0).optional(),
+  userId: z.string().uuid().optional(),
+});
+
+module.exports = { createSalarySchema };
