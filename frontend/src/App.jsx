@@ -30,9 +30,9 @@ const PrivateRoute = ({ children, allowedRoles }) => {
 
   if (loading) return <div className="h-screen flex items-center justify-center">Loading...</div>;
   if (!user) return <Navigate to="/login" />;
-  
+
   if (allowedRoles && !allowedRoles.includes(user.role)) {
-    return <Navigate to="/" />; // Redirect to overview if unauthorized
+    return <Navigate to="/login" />; // Redirect to login if unauthorized
   }
 
   return children;
@@ -47,59 +47,21 @@ const AppRoutes = () => {
   return (
     <Routes>
       <Route path="/login" element={<LoginPage />} />
-      
-      <Route path="/" element={<PrivateRoute><DashboardLayout /></PrivateRoute>}>
+
+      <Route path="/" element={<PrivateRoute allowedRoles={['FINANCE_OFFICER', 'ADMIN']}><DashboardLayout /></PrivateRoute>}>
         <Route index element={<AdminOrOverview />} />
-        
-        {/* Available to vertical users too */}
+
+        <Route path="budget" element={<BudgetPage />} />
         <Route path="requisitions" element={<RequisitionsPage />} />
         <Route path="utilisations" element={<UtilisationPage />} />
-        
-        {/* Admin / Finance Officer only */}
-        <Route path="transactions" element={
-          <PrivateRoute allowedRoles={['FINANCE_OFFICER', 'ADMIN']}>
-            <TransactionsPage />
-          </PrivateRoute>
-        } />
-        
-        <Route path="budget" element={
-          <PrivateRoute allowedRoles={['FINANCE_OFFICER', 'ADMIN']}>
-            <BudgetPage />
-          </PrivateRoute>
-        } />
-        
-        <Route path="salaries" element={
-          <PrivateRoute allowedRoles={['FINANCE_OFFICER', 'ADMIN']}>
-            <SalariesPage />
-          </PrivateRoute>
-        } />
-        
-        <Route path="donors" element={
-          <PrivateRoute allowedRoles={['FINANCE_OFFICER', 'ADMIN']}>
-            <DonorFundsPage />
-          </PrivateRoute>
-        } />
-        
-        <Route path="bank" element={
-          <PrivateRoute allowedRoles={['FINANCE_OFFICER', 'ADMIN']}>
-            <BankRecordsPage />
-          </PrivateRoute>
-        } />
-        
-        <Route path="student-payments" element={
-          <PrivateRoute allowedRoles={['FINANCE_OFFICER', 'ADMIN']}>
-            <StudentPaymentsPage />
-          </PrivateRoute>
-        } />
-
-        {/* Adding reports route that might not have been in sidebar originally but makes sense */}
-        <Route path="reports" element={
-          <PrivateRoute allowedRoles={['FINANCE_OFFICER', 'ADMIN']}>
-            <ReportsPage />
-          </PrivateRoute>
-        } />
+        <Route path="transactions" element={<TransactionsPage />} />
+        <Route path="salaries" element={<SalariesPage />} />
+        <Route path="donors" element={<DonorFundsPage />} />
+        <Route path="bank" element={<BankRecordsPage />} />
+        <Route path="student-payments" element={<StudentPaymentsPage />} />
+        <Route path="reports" element={<ReportsPage />} />
       </Route>
-      
+
       <Route path="*" element={<Navigate to="/" />} />
     </Routes>
   );

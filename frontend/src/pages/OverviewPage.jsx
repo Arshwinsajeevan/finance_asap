@@ -36,8 +36,6 @@ const OverviewPage = () => {
 
     if (user?.role === 'FINANCE_OFFICER' || user?.role === 'ADMIN') {
       fetchOverview();
-    } else {
-      setLoading(false);
     }
   }, [user]);
 
@@ -65,22 +63,6 @@ const OverviewPage = () => {
 
   if (loading) {
     return <div className="flex items-center justify-center h-full">Loading...</div>;
-  }
-
-  // Vertical user view
-  if (user?.role === 'VERTICAL_USER') {
-    return (
-      <div className="space-y-6">
-        <div className="bg-gradient-to-r from-[#00B4D8] to-[#FF6900] rounded-2xl p-8 text-white shadow-md relative overflow-hidden">
-          <div className="absolute top-0 right-0 -mt-16 -mr-16 w-64 h-64 bg-white opacity-10 rounded-full blur-2xl"></div>
-          <div className="absolute bottom-0 left-0 -mb-16 -ml-16 w-48 h-48 bg-white opacity-10 rounded-full blur-xl"></div>
-          <div className="relative z-10">
-            <h2 className="text-3xl font-bold mb-2">Welcome back, {user.name}</h2>
-            <p className="text-white/80">Manage {user.vertical} vertical requisitions and utilisation reports.</p>
-          </div>
-        </div>
-      </div>
-    );
   }
 
   if (!data) return <div>No data available</div>;

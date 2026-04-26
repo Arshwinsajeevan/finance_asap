@@ -8,7 +8,7 @@ const LoginPage = () => {
   const [password, setPassword] = useState('');
   const [error, setError] = useState('');
   const [isLoading, setIsLoading] = useState(false);
-  const { login } = useAuth();
+  const { login, logout } = useAuth();
   const navigate = useNavigate();
 
   const handleSubmit = async (e) => {
@@ -17,10 +17,17 @@ const LoginPage = () => {
     setIsLoading(true);
 
     try {
-      await login(email, password);
+      const loggedInUser = await login(email, password);
+      
+      // Strict block for non-finance users
+      if (loggedInUser.role !== 'FINANCE_OFFICER' && loggedInUser.role !== 'ADMIN') {
+        logout();
+        throw new Error('Access denied. This portal is strictly for Finance and Admin users.');
+      }
+
       navigate('/');
     } catch (err) {
-      setError(err.response?.data?.message || 'Failed to login');
+      setError(err.message || err.response?.data?.message || 'Failed to login');
     } finally {
       setIsLoading(false);
     }
@@ -98,7 +105,6 @@ const LoginPage = () => {
             <p>Demo credentials (password: password123):</p>
             <p className="mt-1 font-medium">finance@asapkerala.gov.in</p>
             <p className="mt-1 font-medium">admin@asapkerala.gov.in</p>
-            <p className="mt-1 font-medium">training@asapkerala.gov.in</p>
           </div>
         </div>
       </div>

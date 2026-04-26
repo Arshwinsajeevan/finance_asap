@@ -57,31 +57,22 @@ const DashboardLayout = () => {
             <div className="text-sm text-gray-800 font-bold truncate">{user.name}</div>
             <div className="text-xs text-gray-500 truncate">{user.email}</div>
             <div className="mt-1 inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-semibold bg-blue-50 text-[#00B4D8]">
-              {user.role} {user.vertical ? `· ${user.vertical}` : ''}
+              {user.role}
             </div>
           </div>
         </div>
 
         <nav className="flex-1 overflow-y-auto py-6 space-y-1">
           <SidebarItem to="/" icon={LayoutDashboard} label="Overview" />
-          
-          {(user.role === 'FINANCE_OFFICER' || user.role === 'ADMIN') && (
-            <SidebarItem to="/budget" icon={PieChart} label="Budget & Allocations" />
-          )}
-          
+          <SidebarItem to="/budget" icon={PieChart} label="Budget & Allocations" />
           <SidebarItem to="/requisitions" icon={FileText} label="Requisitions" />
           <SidebarItem to="/utilisations" icon={ClipboardCheck} label="Utilisation Reports" />
-          
-          {(user.role === 'FINANCE_OFFICER' || user.role === 'ADMIN') && (
-            <>
-              <SidebarItem to="/transactions" icon={ArrowRightLeft} label="Transactions" />
-              <SidebarItem to="/salaries" icon={Users} label="Salaries & Payouts" />
-              <SidebarItem to="/donors" icon={HeartHandshake} label="Donor Funds" />
-              <SidebarItem to="/bank" icon={Landmark} label="Bank Records" />
-              <SidebarItem to="/student-payments" icon={GraduationCap} label="Student Payments" />
-              <SidebarItem to="/reports" icon={FileText} label="Financial Reports" />
-            </>
-          )}
+          <SidebarItem to="/transactions" icon={ArrowRightLeft} label="Transactions" />
+          <SidebarItem to="/salaries" icon={Users} label="Salaries & Payouts" />
+          <SidebarItem to="/donors" icon={HeartHandshake} label="Donor Funds" />
+          <SidebarItem to="/bank" icon={Landmark} label="Bank Records" />
+          <SidebarItem to="/student-payments" icon={GraduationCap} label="Student Payments" />
+          <SidebarItem to="/reports" icon={FileText} label="Financial Reports" />
         </nav>
 
         <div className="p-6 border-t border-gray-100">
