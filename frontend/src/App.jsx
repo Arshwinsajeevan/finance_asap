@@ -13,6 +13,7 @@ import BankRecordsPage from './pages/BankRecordsPage';
 import ReportsPage from './pages/ReportsPage';
 import AdminDashboard from './pages/AdminDashboard';
 import StudentPaymentsPage from './pages/StudentPaymentsPage';
+import RefundsPage from './pages/RefundsPage';
 import UtilisationPage from './pages/UtilisationPage';
 
 // Placeholder components for routes not yet implemented
@@ -58,7 +59,8 @@ const AppRoutes = () => {
         <Route path="salaries" element={<SalariesPage />} />
         <Route path="donors" element={<DonorFundsPage />} />
         <Route path="bank" element={<BankRecordsPage />} />
-        <Route path="student-payments" element={<StudentPaymentsPage />} />
+        <Route path="fee-collections" element={<StudentPaymentsPage />} />
+        <Route path="refunds" element={<RefundsPage />} />
         <Route path="reports" element={<ReportsPage />} />
       </Route>
 

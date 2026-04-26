@@ -11,7 +11,8 @@ import {
   Landmark, 
   LogOut,
   GraduationCap,
-  ClipboardCheck
+  ClipboardCheck,
+  RefreshCcw
 } from 'lucide-react';
 
 const SidebarItem = ({ to, icon: Icon, label }) => (
@@ -71,7 +72,8 @@ const DashboardLayout = () => {
           <SidebarItem to="/salaries" icon={Users} label="Salaries & Payouts" />
           <SidebarItem to="/donors" icon={HeartHandshake} label="Donor Funds" />
           <SidebarItem to="/bank" icon={Landmark} label="Bank Records" />
-          <SidebarItem to="/student-payments" icon={GraduationCap} label="Student Payments" />
+          <SidebarItem to="/fee-collections" icon={GraduationCap} label="Fee Collections" />
+          <SidebarItem to="/refunds" icon={RefreshCcw} label="Refunds" />
           <SidebarItem to="/reports" icon={FileText} label="Financial Reports" />
         </nav>
 

@@ -13,7 +13,6 @@ const StudentPaymentsPage = () => {
   // Modals
   const [showCreateModal, setShowCreateModal] = useState(false);
   const [showInstallmentModal, setShowInstallmentModal] = useState(false);
-  const [showRefundModal, setShowRefundModal] = useState(false);
   const [selectedPayment, setSelectedPayment] = useState(null);
 
   // Forms
@@ -21,7 +20,6 @@ const StudentPaymentsPage = () => {
     studentId: '', courseName: '', totalFee: '', paidAmount: '', paymentType: 'FEE', reference: ''
   });
   const [installmentAmount, setInstallmentAmount] = useState('');
-  const [refundAmount, setRefundAmount] = useState('');
   const [actionReference, setActionReference] = useState('');
 
   const fetchData = async () => {
@@ -88,34 +86,11 @@ const StudentPaymentsPage = () => {
     }
   };
 
-  const handleRefund = async (e) => {
-    e.preventDefault();
-    try {
-      await api.patch(`/finance/student-payments/${selectedPayment.id}/refund`, {
-        refundAmount: Number(refundAmount),
-        reference: actionReference
-      });
-      setShowRefundModal(false);
-      setRefundAmount('');
-      setActionReference('');
-      fetchData();
-    } catch (err) {
-      alert('Failed: ' + (err.response?.data?.message || err.message));
-    }
-  };
-
   const openInstallmentModal = (payment) => {
     setSelectedPayment(payment);
     setInstallmentAmount('');
     setActionReference('');
     setShowInstallmentModal(true);
-  };
-
-  const openRefundModal = (payment) => {
-    setSelectedPayment(payment);
-    setRefundAmount('');
-    setActionReference('');
-    setShowRefundModal(true);
   };
 
   const formatCurrency = (amount) => {
@@ -142,8 +117,8 @@ const StudentPaymentsPage = () => {
     <div className="space-y-6 animate-in fade-in slide-in-from-bottom-4 duration-500">
       <div className="flex justify-between items-center">
         <div>
-          <h2 className="text-2xl font-semibold text-slate-800 tracking-tight">Student Payments</h2>
-          <p className="text-sm text-slate-500 mt-1">Track fee collections, installments, and refunds</p>
+          <h2 className="text-2xl font-semibold text-slate-800 tracking-tight">Fee Collections</h2>
+          <p className="text-sm text-slate-500 mt-1">Track fee collections and installments</p>
         </div>
         {user.role === 'FINANCE_OFFICER' && (
           <button onClick={() => setShowCreateModal(true)} className="btn-primary flex items-center">
@@ -236,15 +211,6 @@ const StudentPaymentsPage = () => {
                               <ArrowDownCircle className="w-4 h-4" />
                             </button>
                           )}
-                          {payment.paidAmount > 0 && payment.status !== 'REFUNDED' && (
-                            <button 
-                              onClick={() => openRefundModal(payment)}
-                              className="p-1.5 bg-red-50 text-red-600 rounded hover:bg-red-100 transition-colors"
-                              title="Issue Refund"
-                            >
-                              <RefreshCw className="w-4 h-4" />
-                            </button>
-                          )}
                         </div>
                       ) : (
                         <span className="text-xs text-slate-400">View Only</span>
@@ -328,35 +294,6 @@ const StudentPaymentsPage = () => {
         </div>
       )}
 
-      {/* Issue Refund Modal */}
-      {showRefundModal && (
-        <div className="fixed inset-0 bg-slate-900/50 flex items-center justify-center z-50 backdrop-blur-sm animate-in fade-in duration-200">
-          <div className="bg-white rounded-xl shadow-2xl w-full max-w-md overflow-hidden animate-in zoom-in-95 duration-200">
-            <div className="px-6 py-4 border-b border-slate-100 flex justify-between items-center bg-red-50">
-              <h3 className="font-semibold text-red-800">Issue Refund</h3>
-              <button onClick={() => setShowRefundModal(false)} className="text-red-400 hover:text-red-600"><X className="w-5 h-5" /></button>
-            </div>
-            <form onSubmit={handleRefund} className="p-6 space-y-4">
-              <div className="bg-slate-50 p-4 rounded-lg mb-4 text-sm text-slate-800">
-                <p className="font-medium">Student: {selectedPayment?.student.name}</p>
-                <p className="mt-1">Max Refundable: {formatCurrency(selectedPayment?.paidAmount)}</p>
-              </div>
-              <div>
-                <label className="block text-sm font-medium text-slate-700 mb-1">Refund Amount (₹)</label>
-                <input type="number" required min="1" max={selectedPayment?.paidAmount} value={refundAmount} onChange={e => setRefundAmount(e.target.value)} className="input-field" placeholder="0" />
-              </div>
-              <div>
-                <label className="block text-sm font-medium text-slate-700 mb-1">Reference</label>
-                <input type="text" value={actionReference} onChange={e => setActionReference(e.target.value)} className="input-field" placeholder="Refund Reference" />
-              </div>
-              <div className="pt-4 flex space-x-3">
-                <button type="button" onClick={() => setShowRefundModal(false)} className="flex-1 py-2 px-4 border border-slate-200 rounded-lg text-slate-600 hover:bg-slate-50 transition-colors">Cancel</button>
-                <button type="submit" className="flex-1 py-2 px-4 rounded-lg text-white font-medium bg-red-600 hover:bg-red-700 transition-colors">Process Refund</button>
-              </div>
-            </form>
-          </div>
-        </div>
-      )}
     </div>
   );
 };
