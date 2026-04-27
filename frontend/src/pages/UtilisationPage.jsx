@@ -1,36 +1,27 @@
 import React, { useState, useEffect } from 'react';
 import api from '../api/axios';
 import { useAuth } from '../context/AuthContext';
-import { Search, FileText, CheckCircle2, XCircle, Plus, X } from 'lucide-react';
+import { FileText, Check, X, Search, FileImage, ShieldAlert, Eye } from 'lucide-react';
 
 const UtilisationPage = () => {
   const { user } = useAuth();
   const [utilisations, setUtilisations] = useState([]);
-  const [summary, setSummary] = useState(null);
   const [loading, setLoading] = useState(true);
-  const [requisitions, setRequisitions] = useState([]); // For the dropdown when submitting
+  const [filter, setFilter] = useState('ALL');
 
   // Modals
-  const [showSubmitModal, setShowSubmitModal] = useState(false);
-  const [showVerifyModal, setShowVerifyModal] = useState(false);
-  const [selectedUtilisation, setSelectedUtilisation] = useState(null);
-
-  // Forms
-  const [formData, setFormData] = useState({
-    requisitionId: '', amount: '', description: '', billNo: ''
-  });
-  const [verifyStatus, setVerifyStatus] = useState('VERIFIED');
+  const [showReviewModal, setShowReviewModal] = useState(false);
+  const [selectedUtil, setSelectedUtil] = useState(null);
+  
+  // Review Actions
   const [rejectionNote, setRejectionNote] = useState('');
+  const [actionType, setActionType] = useState(''); // 'APPROVE' or 'REJECT'
 
   const fetchData = async () => {
     try {
       setLoading(true);
-      const [utRes, sumRes] = await Promise.all([
-        api.get('/finance/utilisations'),
-        api.get('/finance/utilisations/summary')
-      ]);
-      setUtilisations(utRes.data.data);
-      setSummary(sumRes.data.data);
+      const res = await api.get('/finance/utilisations');
+      setUtilisations(res.data.data);
     } catch (err) {
       console.error(err);
     } finally {
@@ -38,62 +29,29 @@ const UtilisationPage = () => {
     }
   };
 
-  const fetchRequisitions = async () => {
-    try {
-      const res = await api.get('/finance/requisitions');
-      // Filter only FUNDS_RELEASED requisitions
-      const released = res.data.data.filter(r => r.status === 'FUNDS_RELEASED');
-      // If vertical user, filter their own (backend might already do this but just to be sure)
-      const allowed = user.role === 'VERTICAL_USER' ? released.filter(r => r.vertical === user.vertical) : released;
-      setRequisitions(allowed);
-    } catch (err) {
-      console.error(err);
-    }
-  };
-
   useEffect(() => {
     fetchData();
-    if (user.role === 'VERTICAL_USER' || user.role === 'FINANCE_OFFICER') {
-      fetchRequisitions();
-    }
-  }, [user.role]);
+  }, []);
 
-  const handleSubmit = async (e) => {
+  const handleAction = async (e) => {
     e.preventDefault();
     try {
-      await api.post('/finance/utilisations', {
-        ...formData,
-        amount: Number(formData.amount)
+      await api.patch(`/finance/utilisations/${selectedUtil.id}/verify`, {
+        status: actionType === 'APPROVE' ? 'APPROVED' : 'REJECTED',
+        rejectionNote: actionType === 'REJECTED' ? rejectionNote : undefined
       });
-      setShowSubmitModal(false);
-      setFormData({ requisitionId: '', amount: '', description: '', billNo: '' });
+      setShowReviewModal(false);
       fetchData();
     } catch (err) {
-      alert('Failed: ' + (err.response?.data?.message || err.message));
+      alert('Action failed: ' + (err.response?.data?.message || err.message));
     }
   };
 
-  const handleVerify = async (e) => {
-    e.preventDefault();
-    try {
-      await api.patch(`/finance/utilisations/${selectedUtilisation.id}/verify`, {
-        status: verifyStatus,
-        rejectionNote: verifyStatus === 'REJECTED' ? rejectionNote : undefined
-      });
-      setShowVerifyModal(false);
-      setVerifyStatus('VERIFIED');
-      setRejectionNote('');
-      fetchData();
-    } catch (err) {
-      alert('Failed: ' + (err.response?.data?.message || err.message));
-    }
-  };
-
-  const openVerifyModal = (utilisation) => {
-    setSelectedUtilisation(utilisation);
-    setVerifyStatus('VERIFIED');
+  const openReviewModal = (util) => {
+    setSelectedUtil(util);
     setRejectionNote('');
-    setShowVerifyModal(true);
+    setActionType('');
+    setShowReviewModal(true);
   };
 
   const formatCurrency = (amount) => {
@@ -104,111 +62,109 @@ const UtilisationPage = () => {
 
   const getStatusBadge = (status) => {
     const styles = {
-      VERIFIED: 'bg-emerald-50 text-emerald-700 border-emerald-200',
+      APPROVED: 'bg-emerald-50 text-emerald-700 border-emerald-200',
       PENDING: 'bg-amber-50 text-amber-700 border-amber-200',
       REJECTED: 'bg-red-50 text-red-700 border-red-200',
     };
+    const labels = {
+      APPROVED: 'Verified & Approved',
+      PENDING: 'Submitted (Review Pending)',
+      REJECTED: 'Rejected'
+    };
     return (
-      <span className={`px-2.5 py-1 rounded-full text-xs font-medium border ${styles[status]}`}>
-        {status}
+      <span className={`px-2.5 py-1 rounded-full text-[10px] font-bold uppercase border ${styles[status] || styles.PENDING}`}>
+        {labels[status] || status}
       </span>
     );
   };
+
+  const filteredData = filter === 'ALL' 
+    ? utilisations 
+    : utilisations.filter(r => r.status === filter);
 
   return (
     <div className="space-y-6 animate-in fade-in slide-in-from-bottom-4 duration-500">
       <div className="flex justify-between items-center">
         <div>
-          <h2 className="text-2xl font-semibold text-slate-800 tracking-tight">Utilisation Reports</h2>
+          <h2 className="text-2xl font-semibold text-slate-800 tracking-tight">Utilisation Reports (Audit)</h2>
           <p className="text-sm text-slate-500 mt-1">
-            {user.role === 'VERTICAL_USER' 
-              ? 'Submit and track expense bills against released funds' 
-              : 'Review and verify vertical expense submissions'}
+            Review and verify utilisation reports submitted by verticals after fund release
           </p>
         </div>
-        {(user.role === 'VERTICAL_USER' || user.role === 'FINANCE_OFFICER') && (
-          <button onClick={() => setShowSubmitModal(true)} className="btn-primary flex items-center">
-            <Plus className="w-4 h-4 mr-2" /> Submit Expense
-          </button>
-        )}
       </div>
 
-      {summary && (
-        <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
-          <div className="card-premium p-5 col-span-1 md:col-span-2 flex items-center bg-blue-50/50">
-            <div className="p-3 bg-blue-100 text-blue-600 rounded-xl mr-4"><FileText className="w-6 h-6" /></div>
-            <div>
-              <p className="text-sm font-medium text-slate-500">Total Utilisation Submitted</p>
-              <h3 className="text-2xl font-bold text-slate-800">{formatCurrency(summary.totals._sum.amount || 0)}</h3>
-            </div>
-          </div>
-          <div className="card-premium p-5 col-span-1 md:col-span-2 flex flex-col justify-center border-l-4 border-l-amber-500">
-            <p className="text-sm font-medium text-slate-500 mb-2">Submissions by Status</p>
-            <div className="flex space-x-6">
-              {summary.byStatus.map(s => (
-                <div key={s.status}>
-                  <p className="text-xs text-slate-400">{s.status}</p>
-                  <p className="text-sm font-bold text-slate-700">{formatCurrency(s._sum.amount)}</p>
-                </div>
-              ))}
-            </div>
+      <div className="card-premium">
+        <div className="px-6 py-4 border-b border-slate-100 flex justify-between items-center bg-slate-50/50 rounded-t-xl overflow-x-auto">
+          <div className="flex space-x-2 shrink-0">
+            {['ALL', 'PENDING', 'APPROVED', 'REJECTED'].map(status => (
+              <button
+                key={status}
+                onClick={() => setFilter(status)}
+                className={`px-4 py-1.5 rounded-lg text-xs font-bold transition-all uppercase ${
+                  filter === status 
+                    ? 'bg-white text-primary-700 shadow-sm border border-slate-200' 
+                    : 'text-slate-500 hover:bg-slate-200/50'
+                }`}
+              >
+                {status === 'PENDING' ? 'SUBMITTED' : status}
+              </button>
+            ))}
           </div>
         </div>
-      )}
 
-      <div className="card-premium">
         <div className="overflow-x-auto">
           <table className="w-full text-sm text-left">
-            <thead className="text-xs text-slate-500 uppercase bg-slate-50 border-b border-slate-100">
+            <thead className="text-[11px] text-slate-500 uppercase bg-white border-b border-slate-100 font-bold">
               <tr>
-                <th className="px-6 py-4 font-semibold">Expense Details</th>
-                <th className="px-6 py-4 font-semibold">Requisition Link</th>
-                <th className="px-6 py-4 font-semibold text-right">Amount</th>
-                <th className="px-6 py-4 font-semibold text-center">Status</th>
-                <th className="px-6 py-4 font-semibold text-center">Actions</th>
+                <th className="px-6 py-4">Expense Details</th>
+                <th className="px-6 py-4">Linked Requisition</th>
+                <th className="px-6 py-4 text-right">Amount Utilised</th>
+                <th className="px-6 py-4 text-center">Audit Status</th>
+                <th className="px-6 py-4 text-center">Actions</th>
               </tr>
             </thead>
             <tbody>
               {loading ? (
-                <tr><td colSpan="5" className="text-center py-8 text-slate-500">Loading...</td></tr>
-              ) : utilisations.length === 0 ? (
-                <tr><td colSpan="5" className="text-center py-8 text-slate-500">No utilisation reports submitted yet</td></tr>
+                <tr><td colSpan="5" className="text-center py-8 text-slate-500">Loading records...</td></tr>
+              ) : filteredData.length === 0 ? (
+                <tr><td colSpan="5" className="text-center py-8 text-slate-500">No utilisation reports found for this filter.</td></tr>
               ) : (
-                utilisations.map((util) => (
-                  <tr key={util.id} className="bg-white border-b border-slate-50 hover:bg-slate-50/50">
+                filteredData.map((util) => (
+                  <tr key={util.id} className="bg-white border-b border-slate-50 hover:bg-slate-50/50 transition-colors">
                     <td className="px-6 py-4">
-                      <div className="font-medium text-slate-900">{util.description}</div>
-                      <div className="text-xs text-slate-500 mt-0.5">Bill: {util.billNo || 'N/A'} • By: {util.submittedBy.name}</div>
+                      <div className="font-semibold text-slate-900">{util.description}</div>
+                      <div className="text-xs text-slate-500 mt-1 flex items-center">
+                        <FileText className="w-3 h-3 mr-1 text-slate-400" />
+                        Bill/Invoice No: {util.billNo || 'Pending'}
+                      </div>
                     </td>
                     <td className="px-6 py-4">
-                      <div className="text-slate-800 line-clamp-1">{util.requisition?.purpose}</div>
-                      <div className="text-[10px] text-slate-400 mt-1 uppercase tracking-wider">{util.vertical}</div>
+                      <div className="text-slate-800 font-medium line-clamp-1">{util.requisition?.purpose}</div>
+                      <div className="text-[10px] bg-slate-100 text-slate-600 px-2 py-0.5 rounded inline-block mt-1 uppercase font-bold tracking-wider">{util.vertical}</div>
                     </td>
-                    <td className="px-6 py-4 text-right font-medium text-slate-800">
+                    <td className="px-6 py-4 text-right font-bold text-slate-800 text-base">
                       {formatCurrency(util.amount)}
                     </td>
                     <td className="px-6 py-4 text-center">
                       <div className="flex flex-col items-center">
                         {getStatusBadge(util.status)}
-                        {util.status === 'REJECTED' && util.rejectionNote && (
-                          <span className="text-[10px] text-red-500 mt-1 line-clamp-1 max-w-[120px]" title={util.rejectionNote}>
-                            {util.rejectionNote}
-                          </span>
-                        )}
                       </div>
                     </td>
                     <td className="px-6 py-4 text-center">
-                      {user.role === 'FINANCE_OFFICER' && util.status === 'PENDING' ? (
+                      {util.status === 'PENDING' ? (
                         <button 
-                          onClick={() => openVerifyModal(util)}
-                          className="flex items-center mx-auto px-3 py-1.5 bg-blue-50 text-blue-600 hover:bg-blue-100 rounded-md text-xs font-semibold transition-colors"
+                          onClick={() => openReviewModal(util)}
+                          className="flex items-center mx-auto px-4 py-2 bg-primary-50 text-primary-700 hover:bg-primary-100 rounded-lg text-xs font-bold transition-all shadow-sm"
                         >
-                          Verify/Reject
+                          <Eye className="w-3.5 h-3.5 mr-1.5" /> Review & Audit
                         </button>
                       ) : (
-                        <span className="text-xs text-slate-400">
-                          {util.status === 'PENDING' ? 'Awaiting Verification' : `Verified by ${util.verifiedBy?.name || 'Admin'}`}
-                        </span>
+                        <button 
+                          onClick={() => openReviewModal(util)}
+                          className="text-xs text-slate-400 hover:text-slate-600 font-semibold underline"
+                        >
+                          View Details
+                        </button>
                       )}
                     </td>
                   </tr>
@@ -219,93 +175,143 @@ const UtilisationPage = () => {
         </div>
       </div>
 
-      {/* Submit Utilisation Modal */}
-      {showSubmitModal && (
-        <div className="fixed inset-0 bg-slate-900/50 flex items-center justify-center z-50 backdrop-blur-sm animate-in fade-in duration-200">
-          <div className="bg-white rounded-xl shadow-2xl w-full max-w-md overflow-hidden animate-in zoom-in-95 duration-200">
-            <div className="px-6 py-4 border-b border-slate-100 flex justify-between items-center bg-slate-50">
-              <h3 className="font-semibold text-slate-800">Submit Expense Detail</h3>
-              <button onClick={() => setShowSubmitModal(false)} className="text-slate-400 hover:text-slate-600"><X className="w-5 h-5" /></button>
+      {/* Review Modal */}
+      {showReviewModal && selectedUtil && (
+        <div className="fixed inset-0 bg-slate-900/60 flex items-center justify-center z-50 backdrop-blur-sm animate-in fade-in duration-200 p-4">
+          <div className="bg-white rounded-2xl shadow-2xl w-full max-w-2xl overflow-hidden flex flex-col max-h-[90vh] animate-in zoom-in-95 duration-200">
+            
+            <div className="px-6 py-5 border-b border-slate-100 flex justify-between items-center bg-slate-50 shrink-0">
+              <h3 className="font-bold text-slate-800 text-lg flex items-center">
+                <ShieldAlert className="w-5 h-5 mr-2 text-primary-600" /> Utilisation Audit Review
+              </h3>
+              <button onClick={() => setShowReviewModal(false)} className="text-slate-400 hover:text-slate-600"><X className="w-5 h-5" /></button>
             </div>
-            <form onSubmit={handleSubmit} className="p-6 space-y-4">
-              <div>
-                <label className="block text-sm font-medium text-slate-700 mb-1">Select Requisition</label>
-                <select required value={formData.requisitionId} onChange={e => setFormData({...formData, requisitionId: e.target.value})} className="input-field">
-                  <option value="">-- Choose Released Requisition --</option>
-                  {requisitions.map(r => (
-                    <option key={r.id} value={r.id}>
-                      {r.purpose} ({formatCurrency(r.releasedAmount)})
-                    </option>
-                  ))}
-                </select>
-              </div>
-              <div>
-                <label className="block text-sm font-medium text-slate-700 mb-1">Expense Description</label>
-                <input type="text" required value={formData.description} onChange={e => setFormData({...formData, description: e.target.value})} className="input-field" placeholder="e.g. Purchased 10 Monitors" />
-              </div>
-              <div className="grid grid-cols-2 gap-4">
-                <div>
-                  <label className="block text-sm font-medium text-slate-700 mb-1">Amount Spent (₹)</label>
-                  <input type="number" required min="1" value={formData.amount} onChange={e => setFormData({...formData, amount: e.target.value})} className="input-field" placeholder="0" />
-                </div>
-                <div>
-                  <label className="block text-sm font-medium text-slate-700 mb-1">Bill / Invoice No.</label>
-                  <input type="text" value={formData.billNo} onChange={e => setFormData({...formData, billNo: e.target.value})} className="input-field" placeholder="Optional" />
-                </div>
-              </div>
-              <div className="pt-4 flex space-x-3">
-                <button type="button" onClick={() => setShowSubmitModal(false)} className="flex-1 py-2 px-4 border border-slate-200 rounded-lg text-slate-600 hover:bg-slate-50 transition-colors">Cancel</button>
-                <button type="submit" className="flex-1 py-2 px-4 rounded-lg text-white font-medium bg-primary-600 hover:bg-primary-700 transition-colors">Submit</button>
-              </div>
-            </form>
-          </div>
-        </div>
-      )}
-
-      {/* Verify Modal */}
-      {showVerifyModal && (
-        <div className="fixed inset-0 bg-slate-900/50 flex items-center justify-center z-50 backdrop-blur-sm animate-in fade-in duration-200">
-          <div className="bg-white rounded-xl shadow-2xl w-full max-w-md overflow-hidden animate-in zoom-in-95 duration-200">
-            <div className="px-6 py-4 border-b border-slate-100 flex justify-between items-center bg-blue-50">
-              <h3 className="font-semibold text-blue-800">Verify Utilisation</h3>
-              <button onClick={() => setShowVerifyModal(false)} className="text-blue-400 hover:text-blue-600"><X className="w-5 h-5" /></button>
-            </div>
-            <form onSubmit={handleVerify} className="p-6 space-y-4">
-              <div className="bg-slate-50 p-4 rounded-lg mb-4 text-sm text-slate-800 border border-slate-200">
-                <p className="font-medium text-slate-600 text-xs uppercase mb-1">Submission Details</p>
-                <p className="font-medium">{selectedUtilisation?.description}</p>
-                <p className="mt-1">Amount: <span className="font-bold">{formatCurrency(selectedUtilisation?.amount)}</span></p>
-                <p className="mt-1">Bill No: {selectedUtilisation?.billNo || 'None provided'}</p>
-              </div>
+            
+            <div className="p-6 overflow-y-auto space-y-6">
               
-              <div>
-                <label className="block text-sm font-medium text-slate-700 mb-2">Action</label>
-                <div className="flex gap-4">
-                  <label className="flex items-center cursor-pointer">
-                    <input type="radio" name="status" value="VERIFIED" checked={verifyStatus === 'VERIFIED'} onChange={() => setVerifyStatus('VERIFIED')} className="mr-2 text-emerald-600 focus:ring-emerald-500" />
-                    <span className="text-sm font-medium text-emerald-700">Approve & Verify</span>
-                  </label>
-                  <label className="flex items-center cursor-pointer">
-                    <input type="radio" name="status" value="REJECTED" checked={verifyStatus === 'REJECTED'} onChange={() => setVerifyStatus('REJECTED')} className="mr-2 text-red-600 focus:ring-red-500" />
-                    <span className="text-sm font-medium text-red-700">Reject</span>
-                  </label>
+              {/* Financial Snapshot */}
+              <div className="grid grid-cols-3 gap-4">
+                <div className="bg-slate-50 p-4 rounded-xl border border-slate-100">
+                  <p className="text-[10px] text-slate-500 uppercase font-bold mb-1">Vertical / Dept</p>
+                  <p className="font-bold text-slate-800">{selectedUtil.vertical}</p>
+                </div>
+                <div className="bg-slate-50 p-4 rounded-xl border border-slate-100">
+                  <p className="text-[10px] text-slate-500 uppercase font-bold mb-1">Fund Released</p>
+                  <p className="font-bold text-blue-600">{formatCurrency(selectedUtil.requisition?.releasedAmount || 0)}</p>
+                </div>
+                <div className={`p-4 rounded-xl border ${selectedUtil.amount > (selectedUtil.requisition?.releasedAmount || 0) ? 'bg-red-50 border-red-200' : 'bg-slate-50 border-slate-100'}`}>
+                  <p className="text-[10px] text-slate-500 uppercase font-bold mb-1">Amount Utilised</p>
+                  <p className={`font-bold ${selectedUtil.amount > (selectedUtil.requisition?.releasedAmount || 0) ? 'text-red-600' : 'text-slate-800'}`}>
+                    {formatCurrency(selectedUtil.amount)}
+                  </p>
                 </div>
               </div>
 
-              {verifyStatus === 'REJECTED' && (
-                <div>
-                  <label className="block text-sm font-medium text-slate-700 mb-1">Rejection Reason</label>
-                  <textarea required value={rejectionNote} onChange={e => setRejectionNote(e.target.value)} className="input-field min-h-[80px]" placeholder="Explain why this expense is rejected..." />
+              {/* Validation Warnings */}
+              {selectedUtil.status === 'PENDING' && selectedUtil.amount > (selectedUtil.requisition?.releasedAmount || 0) && (
+                <div className="bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded-xl text-sm flex items-start">
+                  <ShieldAlert className="w-5 h-5 mr-2 shrink-0 text-red-500" />
+                  <div>
+                    <p className="font-bold">Compliance Failure</p>
+                    <p>Utilised amount exceeds the approved released funds. Approval is blocked.</p>
+                  </div>
                 </div>
               )}
 
-              <div className="pt-4 flex space-x-3">
-                <button type="button" onClick={() => setShowVerifyModal(false)} className="flex-1 py-2 px-4 border border-slate-200 rounded-lg text-slate-600 hover:bg-slate-50 transition-colors">Cancel</button>
-                <button type="submit" className={`flex-1 py-2 px-4 rounded-lg text-white font-medium transition-colors ${verifyStatus === 'VERIFIED' ? 'bg-emerald-600 hover:bg-emerald-700' : 'bg-red-600 hover:bg-red-700'}`}>
-                  Confirm
-                </button>
+              {selectedUtil.status === 'PENDING' && !selectedUtil.billNo && (
+                <div className="bg-amber-50 border border-amber-200 text-amber-700 px-4 py-3 rounded-xl text-sm flex items-start">
+                  <ShieldAlert className="w-5 h-5 mr-2 shrink-0 text-amber-500" />
+                  <div>
+                    <p className="font-bold">Missing Documentation</p>
+                    <p>No bill or invoice number provided. Please verify proof before approving.</p>
+                  </div>
+                </div>
+              )}
+
+              {/* Expense Details */}
+              <div>
+                <h4 className="text-sm font-bold text-slate-800 mb-3 border-b pb-2">Expense Breakdown & Proof</h4>
+                <div className="grid grid-cols-2 gap-6">
+                  <div>
+                    <p className="text-xs text-slate-500 font-medium mb-1">Description / Purpose</p>
+                    <p className="text-sm font-medium text-slate-800">{selectedUtil.description}</p>
+                    
+                    <p className="text-xs text-slate-500 font-medium mt-4 mb-1">Linked Requisition</p>
+                    <p className="text-sm font-medium text-slate-800">{selectedUtil.requisition?.purpose}</p>
+                  </div>
+                  
+                  <div>
+                    <p className="text-xs text-slate-500 font-medium mb-2">Uploaded Proof</p>
+                    <div className="border border-dashed border-slate-300 rounded-lg p-4 flex flex-col items-center justify-center bg-slate-50 text-slate-500 h-24">
+                      <FileImage className="w-6 h-6 mb-2 text-slate-400" />
+                      <span className="text-xs font-medium">Invoice Document (Demo)</span>
+                    </div>
+                  </div>
+                </div>
               </div>
-            </form>
+
+              {selectedUtil.status === 'REJECTED' && selectedUtil.rejectionNote && (
+                <div className="bg-red-50 p-4 rounded-xl border border-red-100">
+                  <p className="text-xs text-red-600 font-bold uppercase mb-1">Rejection Reason</p>
+                  <p className="text-sm text-red-800">{selectedUtil.rejectionNote}</p>
+                </div>
+              )}
+
+              {/* Action Form (Only if PENDING) */}
+              {selectedUtil.status === 'PENDING' && (
+                <div className="pt-4 border-t border-slate-100">
+                  <h4 className="text-sm font-bold text-slate-800 mb-3">Audit Decision</h4>
+                  <form onSubmit={handleAction} className="space-y-4">
+                    <div className="flex gap-4">
+                      <label className={`flex-1 border rounded-xl p-4 cursor-pointer transition-all ${actionType === 'APPROVE' ? 'border-emerald-500 bg-emerald-50 ring-1 ring-emerald-500' : 'border-slate-200 hover:border-emerald-200 hover:bg-slate-50'}`}>
+                        <div className="flex items-center">
+                          <input type="radio" name="action" value="APPROVE" onChange={() => setActionType('APPROVE')} className="mr-3 text-emerald-600 focus:ring-emerald-500 w-4 h-4" />
+                          <div>
+                            <p className="font-bold text-emerald-700 text-sm">Approve & Verify</p>
+                            <p className="text-xs text-emerald-600/70 mt-0.5">Marks requisition as completed</p>
+                          </div>
+                        </div>
+                      </label>
+
+                      <label className={`flex-1 border rounded-xl p-4 cursor-pointer transition-all ${actionType === 'REJECT' ? 'border-red-500 bg-red-50 ring-1 ring-red-500' : 'border-slate-200 hover:border-red-200 hover:bg-slate-50'}`}>
+                        <div className="flex items-center">
+                          <input type="radio" name="action" value="REJECT" onChange={() => setActionType('REJECT')} className="mr-3 text-red-600 focus:ring-red-500 w-4 h-4" />
+                          <div>
+                            <p className="font-bold text-red-700 text-sm">Reject Submission</p>
+                            <p className="text-xs text-red-600/70 mt-0.5">Sends back for resubmission</p>
+                          </div>
+                        </div>
+                      </label>
+                    </div>
+
+                    {actionType === 'REJECT' && (
+                      <div className="animate-in fade-in slide-in-from-top-2">
+                        <textarea 
+                          required 
+                          value={rejectionNote} 
+                          onChange={e => setRejectionNote(e.target.value)} 
+                          className="input-field min-h-[100px]" 
+                          placeholder="Please provide the exact reason for rejection (e.g., 'Invoice mismatch', 'Missing GST number')..." 
+                        />
+                      </div>
+                    )}
+
+                    <div className="pt-4 flex justify-end">
+                      <button 
+                        type="submit" 
+                        disabled={!actionType || (actionType === 'APPROVE' && selectedUtil.amount > (selectedUtil.requisition?.releasedAmount || 0))}
+                        className={`px-6 py-2.5 rounded-xl text-white font-bold transition-all shadow-sm disabled:opacity-50 disabled:cursor-not-allowed ${
+                          actionType === 'REJECT' ? 'bg-red-600 hover:bg-red-700 shadow-red-600/20' : 
+                          'bg-emerald-600 hover:bg-emerald-700 shadow-emerald-600/20'
+                        }`}
+                      >
+                        Confirm Decision
+                      </button>
+                    </div>
+                  </form>
+                </div>
+              )}
+            </div>
           </div>
         </div>
       )}

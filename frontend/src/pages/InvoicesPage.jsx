@@ -1,31 +1,28 @@
 import React, { useState, useEffect } from 'react';
 import api from '../api/axios';
 import { useAuth } from '../context/AuthContext';
-import { FileText, Plus, X, Search, ArrowDownCircle, CheckCircle } from 'lucide-react';
+import { FileText, Plus, X, CheckCircle, Receipt } from 'lucide-react';
 
 const InvoicesPage = () => {
   const { user } = useAuth();
   const [invoices, setInvoices] = useState([]);
-  const [totals, setTotals] = useState({ inboundTotal: 0, outboundTotal: 0 });
+  const [totals, setTotals] = useState(0);
   const [loading, setLoading] = useState(true);
   
   const [showCreateModal, setShowCreateModal] = useState(false);
-  const [filterDirection, setFilterDirection] = useState('');
   
   const [formData, setFormData] = useState({
-    direction: 'INBOUND',
     vertical: 'TRAINING',
-    issuedTo: '',
-    amount: '',
-    description: '',
-    dueDate: ''
+    clientName: '',
+    baseAmount: '',
+    gstPercent: 0,
+    description: ''
   });
 
   const fetchData = async () => {
     try {
       setLoading(true);
-      const url = filterDirection ? `/finance/invoices?direction=${filterDirection}` : '/finance/invoices';
-      const res = await api.get(url);
+      const res = await api.get('/finance/invoices');
       setInvoices(res.data.data.invoices);
       setTotals(res.data.data.totals);
     } catch (err) {
@@ -37,17 +34,18 @@ const InvoicesPage = () => {
 
   useEffect(() => {
     fetchData();
-  }, [filterDirection]);
+  }, []);
 
   const handleCreate = async (e) => {
     e.preventDefault();
     try {
       await api.post('/finance/invoices', {
         ...formData,
-        dueDate: formData.dueDate ? new Date(formData.dueDate).toISOString() : null
+        baseAmount: Number(formData.baseAmount),
+        gstPercent: Number(formData.gstPercent)
       });
       setShowCreateModal(false);
-      setFormData({ direction: 'INBOUND', vertical: 'TRAINING', issuedTo: '', amount: '', description: '', dueDate: '' });
+      setFormData({ vertical: 'TRAINING', clientName: '', baseAmount: '', gstPercent: 0, description: '' });
       fetchData();
     } catch (err) {
       alert('Failed: ' + (err.response?.data?.message || err.message));
@@ -79,134 +77,111 @@ const InvoicesPage = () => {
   const getStatusBadge = (status) => {
     const styles = {
       PAID: 'bg-emerald-50 text-emerald-700 border-emerald-200',
-      SANCTIONED: 'bg-emerald-50 text-emerald-700 border-emerald-200',
-      ISSUED: 'bg-blue-50 text-blue-700 border-blue-200',
-      CANCELLED: 'bg-slate-50 text-slate-700 border-slate-200',
+      APPROVED: 'bg-blue-50 text-blue-700 border-blue-200',
+      DRAFT: 'bg-slate-50 text-slate-700 border-slate-200',
     };
     return (
-      <span className={`px-2.5 py-1 rounded-full text-xs font-medium border ${styles[status]}`}>
+      <span className={`px-2.5 py-1 rounded-full text-[10px] font-bold border ${styles[status]}`}>
         {status}
       </span>
     );
   };
 
+  // Derived values for the form
+  const formBase = Number(formData.baseAmount) || 0;
+  const formGstPct = Number(formData.gstPercent) || 0;
+  const formGstAmt = (formBase * formGstPct) / 100;
+  const formTotal = formBase + formGstAmt;
+
   return (
     <div className="space-y-6 animate-in fade-in slide-in-from-bottom-4 duration-500">
       <div className="flex justify-between items-center">
         <div>
-          <h2 className="text-2xl font-semibold text-slate-800 tracking-tight">Invoice Management</h2>
-          <p className="text-sm text-slate-500 mt-1">Manage inbound (vendor/vertical) and outbound (student/donor) invoices</p>
+          <h2 className="text-2xl font-bold text-slate-800 tracking-tight">Invoice Management</h2>
+          <p className="text-sm text-slate-500 mt-1">Create and manage tax invoices with automatic GST calculation</p>
         </div>
         {user.role === 'FINANCE_OFFICER' && (
-          <button onClick={() => setShowCreateModal(true)} className="btn-primary flex items-center">
+          <button onClick={() => setShowCreateModal(true)} className="btn-primary flex items-center shadow-md">
             <Plus className="w-4 h-4 mr-2" /> Create Invoice
           </button>
         )}
       </div>
 
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-        <div className="card-premium p-5 flex items-center border-l-4 border-l-blue-500">
-          <div className="p-3 bg-blue-100 text-blue-600 rounded-xl mr-4"><ArrowDownCircle className="w-6 h-6" /></div>
-          <div>
-            <p className="text-sm font-medium text-slate-500">Inbound Invoices (To Pay / Sanction)</p>
-            <h3 className="text-xl font-bold text-slate-800">{formatCurrency(totals.inboundTotal)}</h3>
-          </div>
+      <div className="card-premium p-6 border-l-4 border-indigo-500 bg-indigo-50/30 w-full md:w-1/3">
+        <div className="flex items-center space-x-3 mb-2">
+          <div className="p-2 bg-indigo-100 text-indigo-600 rounded-lg"><Receipt className="w-5 h-5" /></div>
+          <h3 className="text-sm font-bold text-indigo-800 uppercase tracking-wider">Total Invoiced Amount</h3>
         </div>
-        <div className="card-premium p-5 flex items-center border-l-4 border-l-emerald-500">
-          <div className="p-3 bg-emerald-100 text-emerald-600 rounded-xl mr-4"><FileText className="w-6 h-6" /></div>
-          <div>
-            <p className="text-sm font-medium text-slate-500">Outbound Invoices (Issued)</p>
-            <h3 className="text-xl font-bold text-slate-800">{formatCurrency(totals.outboundTotal)}</h3>
-          </div>
-        </div>
+        <p className="text-3xl font-bold text-indigo-700 mt-3">{formatCurrency(totals)}</p>
       </div>
 
       <div className="card-premium">
-        <div className="p-4 border-b border-slate-100 flex justify-between items-center bg-slate-50/50">
-          <div className="flex space-x-2">
-            <button 
-              onClick={() => setFilterDirection('')}
-              className={`px-3 py-1.5 rounded-lg text-sm font-medium transition-colors ${filterDirection === '' ? 'bg-white shadow-sm text-slate-800 border border-slate-200' : 'text-slate-500 hover:bg-slate-100'}`}
-            >
-              All Invoices
-            </button>
-            <button 
-              onClick={() => setFilterDirection('INBOUND')}
-              className={`px-3 py-1.5 rounded-lg text-sm font-medium transition-colors ${filterDirection === 'INBOUND' ? 'bg-white shadow-sm text-blue-700 border border-blue-200' : 'text-slate-500 hover:bg-slate-100'}`}
-            >
-              Inbound (Payable)
-            </button>
-            <button 
-              onClick={() => setFilterDirection('OUTBOUND')}
-              className={`px-3 py-1.5 rounded-lg text-sm font-medium transition-colors ${filterDirection === 'OUTBOUND' ? 'bg-white shadow-sm text-emerald-700 border border-emerald-200' : 'text-slate-500 hover:bg-slate-100'}`}
-            >
-              Outbound (Receivable)
-            </button>
-          </div>
-        </div>
-        
         <div className="overflow-x-auto">
           <table className="w-full text-sm text-left">
-            <thead className="text-xs text-slate-500 uppercase bg-slate-50 border-b border-slate-100">
+            <thead className="text-[11px] text-slate-500 uppercase bg-slate-50 border-b border-slate-100 font-bold">
               <tr>
-                <th className="px-6 py-4 font-semibold">Invoice Details</th>
-                <th className="px-6 py-4 font-semibold">Issued To</th>
-                <th className="px-6 py-4 font-semibold">Amount</th>
-                <th className="px-6 py-4 font-semibold text-center">Status</th>
-                <th className="px-6 py-4 font-semibold text-center">Actions</th>
+                <th className="px-6 py-4">Invoice No & Date</th>
+                <th className="px-6 py-4">Client</th>
+                <th className="px-6 py-4 text-right">Base Amount</th>
+                <th className="px-6 py-4 text-right">GST Amount</th>
+                <th className="px-6 py-4 text-right">Total Amount</th>
+                <th className="px-6 py-4 text-center">Status</th>
+                <th className="px-6 py-4 text-center">Actions</th>
               </tr>
             </thead>
             <tbody>
               {loading ? (
-                <tr><td colSpan="5" className="text-center py-8 text-slate-500">Loading...</td></tr>
+                <tr><td colSpan="7" className="text-center py-8 text-slate-500">Loading invoices...</td></tr>
               ) : invoices.length === 0 ? (
-                <tr><td colSpan="5" className="text-center py-8 text-slate-500">No invoices found</td></tr>
+                <tr><td colSpan="7" className="text-center py-8 text-slate-500">No invoices found</td></tr>
               ) : (
                 invoices.map((inv) => (
-                  <tr key={inv.id} className="bg-white border-b border-slate-50 hover:bg-slate-50/50">
+                  <tr key={inv.id} className="bg-white border-b border-slate-50 hover:bg-slate-50/50 transition-colors">
                     <td className="px-6 py-4">
-                      <div className="flex items-center space-x-2">
-                        {inv.direction === 'INBOUND' ? 
-                          <span className="px-1.5 py-0.5 rounded text-[10px] font-bold bg-blue-100 text-blue-700">INBOUND</span> : 
-                          <span className="px-1.5 py-0.5 rounded text-[10px] font-bold bg-emerald-100 text-emerald-700">OUTBOUND</span>
-                        }
-                        <span className="font-mono text-xs font-semibold text-slate-700">{inv.invoiceNumber}</span>
-                      </div>
-                      <div className="text-xs text-slate-500 mt-1">{inv.description}</div>
-                      <div className="text-[10px] text-slate-400 mt-1 uppercase tracking-wider">Dept: {inv.vertical}</div>
+                      <div className="font-mono text-xs font-bold text-slate-700">{inv.invoiceNumber}</div>
+                      <div className="text-[11px] text-slate-500 mt-1">{formatDate(inv.createdAt)}</div>
                     </td>
                     <td className="px-6 py-4">
-                      <div className="font-medium text-slate-800">{inv.issuedTo || '-'}</div>
-                      {inv.dueDate && (
-                        <div className="text-xs text-slate-500 mt-0.5">Due: {formatDate(inv.dueDate)}</div>
-                      )}
+                      <div className="font-bold text-slate-800">{inv.clientName}</div>
+                      <div className="text-[10px] text-slate-400 mt-0.5 uppercase">{inv.vertical}</div>
                     </td>
-                    <td className="px-6 py-4">
-                      <div className={`font-bold ${inv.direction === 'INBOUND' ? 'text-slate-800' : 'text-emerald-600'}`}>
-                        {formatCurrency(inv.amount)}
-                      </div>
+                    <td className="px-6 py-4 text-right">
+                      <div className="font-medium text-slate-600">{formatCurrency(inv.baseAmount)}</div>
+                    </td>
+                    <td className="px-6 py-4 text-right">
+                      <div className="font-medium text-slate-600">{formatCurrency(inv.gstAmount)} <span className="text-[10px] text-slate-400 ml-1">({inv.gstPercent}%)</span></div>
+                    </td>
+                    <td className="px-6 py-4 text-right">
+                      <div className="font-bold text-emerald-600 text-base">{formatCurrency(inv.totalAmount)}</div>
                     </td>
                     <td className="px-6 py-4 text-center">
                       {getStatusBadge(inv.status)}
                     </td>
                     <td className="px-6 py-4 text-center">
-                      {user.role === 'FINANCE_OFFICER' && inv.status === 'ISSUED' && (
-                        <div className="flex justify-center space-x-2">
-                          <button 
-                            onClick={() => updateStatus(inv.id, inv.direction === 'INBOUND' ? 'SANCTIONED' : 'PAID')}
-                            className="p-1.5 bg-emerald-50 text-emerald-600 rounded hover:bg-emerald-100 transition-colors"
-                            title={inv.direction === 'INBOUND' ? 'Sanction Invoice' : 'Mark as Paid'}
-                          >
-                            <CheckCircle className="w-4 h-4" />
-                          </button>
-                          <button 
-                            onClick={() => updateStatus(inv.id, 'CANCELLED')}
-                            className="p-1.5 bg-slate-50 text-slate-600 rounded hover:bg-slate-100 transition-colors"
-                            title="Cancel Invoice"
-                          >
-                            <X className="w-4 h-4" />
-                          </button>
+                      {user.role === 'FINANCE_OFFICER' ? (
+                        <div className="flex justify-center">
+                          {inv.status === 'DRAFT' && (
+                            <button 
+                              onClick={() => updateStatus(inv.id, 'APPROVED')}
+                              className="px-3 py-1.5 bg-blue-50 text-blue-700 font-bold text-xs rounded-lg hover:bg-blue-100 transition-colors"
+                            >
+                              Approve
+                            </button>
+                          )}
+                          {inv.status === 'APPROVED' && (
+                            <button 
+                              onClick={() => updateStatus(inv.id, 'PAID')}
+                              className="px-3 py-1.5 bg-emerald-50 text-emerald-700 font-bold text-xs rounded-lg hover:bg-emerald-100 transition-colors flex items-center"
+                            >
+                              <CheckCircle className="w-3 h-3 mr-1" /> Mark Paid
+                            </button>
+                          )}
+                          {inv.status === 'PAID' && (
+                            <span className="text-xs font-bold text-slate-400">Paid</span>
+                          )}
                         </div>
+                      ) : (
+                        <span className="text-xs text-slate-400">View Only</span>
                       )}
                     </td>
                   </tr>
@@ -219,27 +194,28 @@ const InvoicesPage = () => {
 
       {/* Create Modal */}
       {showCreateModal && (
-        <div className="fixed inset-0 bg-slate-900/50 flex items-center justify-center z-50 backdrop-blur-sm animate-in fade-in duration-200">
-          <div className="bg-white rounded-xl shadow-2xl w-full max-w-lg overflow-hidden animate-in zoom-in-95 duration-200">
-            <div className="px-6 py-4 border-b border-slate-100 flex justify-between items-center bg-slate-50">
-              <h3 className="font-semibold text-slate-800">Create New Invoice</h3>
-              <button onClick={() => setShowCreateModal(false)} className="text-slate-400 hover:text-slate-600"><X className="w-5 h-5" /></button>
+        <div className="fixed inset-0 bg-slate-900/60 flex items-center justify-center z-50 backdrop-blur-sm animate-in fade-in duration-200">
+          <div className="bg-white rounded-2xl shadow-2xl w-full max-w-lg overflow-hidden animate-in zoom-in-95 duration-200">
+            <div className="px-6 py-4 border-b border-slate-100 flex justify-between items-center bg-indigo-50">
+              <h3 className="font-bold text-indigo-900 flex items-center"><FileText className="w-5 h-5 mr-2" /> Create GST Invoice</h3>
+              <button onClick={() => setShowCreateModal(false)} className="text-indigo-400 hover:text-indigo-600"><X className="w-5 h-5" /></button>
             </div>
-            <form onSubmit={handleCreate} className="p-6 space-y-4">
+            
+            <form onSubmit={handleCreate} className="p-6 space-y-5">
               <div className="grid grid-cols-2 gap-4">
                 <div>
-                  <label className="block text-sm font-medium text-slate-700 mb-1">Direction</label>
-                  <select 
+                  <label className="block text-sm font-bold text-slate-700 mb-1">Client / Entity Name</label>
+                  <input 
+                    type="text" 
+                    required 
+                    value={formData.clientName} 
+                    onChange={e => setFormData({...formData, clientName: e.target.value})} 
                     className="input-field" 
-                    value={formData.direction} 
-                    onChange={e => setFormData({...formData, direction: e.target.value})}
-                  >
-                    <option value="INBOUND">Inbound (To Pay / Vertical Bill)</option>
-                    <option value="OUTBOUND">Outbound (To Receive / Student)</option>
-                  </select>
+                    placeholder="E.g. Acme Corp" 
+                  />
                 </div>
                 <div>
-                  <label className="block text-sm font-medium text-slate-700 mb-1">Department / Vertical</label>
+                  <label className="block text-sm font-bold text-slate-700 mb-1">Vertical / Department</label>
                   <select 
                     className="input-field" 
                     value={formData.vertical} 
@@ -251,61 +227,72 @@ const InvoicesPage = () => {
                     <option value="TBB">TBB</option>
                     <option value="FUND_RAISING">Fund Raising</option>
                     <option value="SECRETARIAT">Secretariat</option>
-                    <option value="FINANCE">Finance</option>
                   </select>
                 </div>
               </div>
 
               <div>
-                <label className="block text-sm font-medium text-slate-700 mb-1">Issued To (Name)</label>
+                <label className="block text-sm font-bold text-slate-700 mb-1">Description of Service</label>
                 <input 
                   type="text" 
-                  required 
-                  value={formData.issuedTo} 
-                  onChange={e => setFormData({...formData, issuedTo: e.target.value})} 
+                  value={formData.description} 
+                  onChange={e => setFormData({...formData, description: e.target.value})} 
                   className="input-field" 
-                  placeholder="e.g. Student Name, Vendor Name, or Department Head" 
+                  placeholder="Software development services..." 
                 />
               </div>
 
               <div className="grid grid-cols-2 gap-4">
                 <div>
-                  <label className="block text-sm font-medium text-slate-700 mb-1">Amount (₹)</label>
+                  <label className="block text-sm font-bold text-slate-700 mb-1">Base Amount (₹)</label>
                   <input 
                     type="number" 
                     required 
                     min="1" 
-                    value={formData.amount} 
-                    onChange={e => setFormData({...formData, amount: e.target.value})} 
-                    className="input-field" 
+                    value={formData.baseAmount} 
+                    onChange={e => setFormData({...formData, baseAmount: e.target.value})} 
+                    className="input-field font-bold text-slate-800" 
                     placeholder="0" 
                   />
                 </div>
                 <div>
-                  <label className="block text-sm font-medium text-slate-700 mb-1">Due Date</label>
-                  <input 
-                    type="date" 
-                    value={formData.dueDate} 
-                    onChange={e => setFormData({...formData, dueDate: e.target.value})} 
+                  <label className="block text-sm font-bold text-slate-700 mb-1">GST Percentage</label>
+                  <select 
                     className="input-field" 
-                  />
+                    value={formData.gstPercent} 
+                    onChange={e => setFormData({...formData, gstPercent: e.target.value})}
+                  >
+                    <option value="0">0%</option>
+                    <option value="5">5%</option>
+                    <option value="12">12%</option>
+                    <option value="18">18%</option>
+                  </select>
                 </div>
               </div>
 
-              <div>
-                <label className="block text-sm font-medium text-slate-700 mb-1">Description / Purpose</label>
-                <textarea 
-                  required 
-                  value={formData.description} 
-                  onChange={e => setFormData({...formData, description: e.target.value})} 
-                  className="input-field min-h-[80px] py-2" 
-                  placeholder="Details of the goods, services, or fees..." 
-                />
+              {/* Auto Calculated Totals Panel */}
+              <div className="bg-slate-50 p-4 rounded-xl border border-slate-200 mt-2">
+                <div className="flex justify-between items-center mb-2">
+                  <span className="text-sm font-medium text-slate-500">Base Amount</span>
+                  <span className="text-sm font-bold text-slate-700">{formatCurrency(formBase)}</span>
+                </div>
+                <div className="flex justify-between items-center mb-3">
+                  <span className="text-sm font-medium text-slate-500">GST Amount ({formGstPct}%)</span>
+                  <span className="text-sm font-bold text-slate-700">+{formatCurrency(formGstAmt)}</span>
+                </div>
+                <div className="flex justify-between items-center pt-3 border-t border-slate-200">
+                  <span className="text-sm font-black text-slate-800 uppercase tracking-wider">Total Invoice Value</span>
+                  <span className="text-xl font-black text-emerald-600">{formatCurrency(formTotal)}</span>
+                </div>
               </div>
 
-              <div className="pt-4 flex space-x-3">
-                <button type="button" onClick={() => setShowCreateModal(false)} className="flex-1 py-2 px-4 border border-slate-200 rounded-lg text-slate-600 hover:bg-slate-50 transition-colors">Cancel</button>
-                <button type="submit" className="flex-1 py-2 px-4 rounded-lg text-white font-medium bg-primary-600 hover:bg-primary-700 transition-colors">Generate Invoice</button>
+              <div className="pt-2 flex space-x-3">
+                <button type="button" onClick={() => setShowCreateModal(false)} className="flex-1 py-2.5 px-4 border border-slate-200 rounded-xl text-slate-600 hover:bg-slate-50 font-bold transition-colors">
+                  Cancel
+                </button>
+                <button type="submit" className="flex-1 py-2.5 px-4 rounded-xl text-white font-bold bg-indigo-600 hover:bg-indigo-700 transition-colors shadow-sm shadow-indigo-600/20">
+                  Create Draft
+                </button>
               </div>
             </form>
           </div>

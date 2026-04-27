@@ -163,6 +163,7 @@ model StudentPayment {
   reference       String?  // Payment gateway reference
   createdAt       DateTime @default(now())
   updatedAt       DateTime @updatedAt
+  refundRequests  RefundRequest[]
 }
 
 // ─── AUDIT LOG ───────────────────────────────────────────────
@@ -206,14 +207,29 @@ model Utilisation {
 model Invoice {
   id            String   @id @default(uuid())
   invoiceNumber String   @unique
-  direction     String   // INBOUND, OUTBOUND
+  direction     String   @default("OUTBOUND") // INBOUND, OUTBOUND
   vertical      String   // TRAINING, CSP, SDC, FUND_RAISING, TBB, SECRETARIAT, FINANCE
-  amount        Float
-  status        String   @default("ISSUED") // ISSUED, PAID, CANCELLED, SANCTIONED
-  issuedTo      String?  // Student, Vendor, or Entity Name
-  description   String
-  dueDate       DateTime?
-  referenceId   String?  // Link to StudentPayment, Utilisation, etc.
+  clientName    String   // The client or entity name
+  baseAmount    Float
+  gstPercent    Int
+  gstAmount     Float
+  totalAmount   Float
+  status        String   @default("DRAFT") // DRAFT, APPROVED, PAID
+  description   String?
   createdAt     DateTime @default(now())
   updatedAt     DateTime @updatedAt
+}
+
+// ─── REFUNDS ──────────────────────────────────────────────────
+
+model RefundRequest {
+  id               String   @id @default(uuid())
+  studentPaymentId String
+  studentPayment   StudentPayment @relation(fields: [studentPaymentId], references: [id])
+  refundAmount     Float
+  reason           String
+  status           String   @default("PENDING") // PENDING, APPROVED, REJECTED
+  rejectionNote    String?
+  createdAt        DateTime @default(now())
+  updatedAt        DateTime @updatedAt
 }

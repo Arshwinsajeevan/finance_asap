@@ -8,16 +8,9 @@ const TransactionsPage = () => {
   const [transactions, setTransactions] = useState([]);
   const [summary, setSummary] = useState(null);
   const [loading, setLoading] = useState(true);
-  const [showModal, setShowModal] = useState(false);
-  
   // Filters
   const [typeFilter, setTypeFilter] = useState('');
   const [sourceFilter, setSourceFilter] = useState('');
-
-  // Create form state
-  const [formData, setFormData] = useState({
-    amount: '', transactionType: 'EXPENSE', source: 'SECRETARIAT', description: '', reference: ''
-  });
 
   const fetchTransactions = async () => {
     try {
@@ -44,20 +37,6 @@ const TransactionsPage = () => {
     fetchTransactions();
   }, [typeFilter, sourceFilter]);
 
-  const handleCreate = async (e) => {
-    e.preventDefault();
-    try {
-      await api.post('/finance/transactions', {
-        ...formData,
-        amount: Number(formData.amount),
-      });
-      setShowModal(false);
-      setFormData({ amount: '', transactionType: 'EXPENSE', source: 'SECRETARIAT', description: '', reference: '' });
-      fetchTransactions();
-    } catch (err) {
-      alert('Failed: ' + (err.response?.data?.message || err.message));
-    }
-  };
 
   const handleExportCSV = () => {
     const headers = ['Date', 'Type', 'Source', 'Description', 'Amount', 'Status', 'Reference'];
@@ -107,15 +86,6 @@ const TransactionsPage = () => {
             <Download className="w-4 h-4 mr-2" />
             Export CSV
           </button>
-          {user.role === 'FINANCE_OFFICER' && (
-            <button 
-              onClick={() => setShowModal(true)}
-              className="btn-primary flex items-center"
-            >
-              <Plus className="w-4 h-4 mr-2" />
-              Record Transaction
-            </button>
-          )}
         </div>
       </div>
 
@@ -247,83 +217,7 @@ const TransactionsPage = () => {
         </div>
       </div>
 
-      {/* Create Transaction Modal */}
-      {showModal && (
-        <div className="fixed inset-0 bg-slate-900/50 flex items-center justify-center z-50 backdrop-blur-sm animate-in fade-in duration-200">
-          <div className="bg-white rounded-xl shadow-2xl w-full max-w-md overflow-hidden animate-in zoom-in-95 duration-200">
-            <div className="px-6 py-4 border-b border-slate-100 flex justify-between items-center bg-slate-50">
-              <h3 className="font-semibold text-slate-800">Record New Transaction</h3>
-              <button onClick={() => setShowModal(false)} className="text-slate-400 hover:text-slate-600">
-                <X className="w-5 h-5" />
-              </button>
-            </div>
-            <form onSubmit={handleCreate} className="p-6 space-y-4">
-              <div>
-                <label className="block text-sm font-medium text-slate-700 mb-1">Transaction Type</label>
-                <select 
-                  value={formData.transactionType} 
-                  onChange={e => setFormData({...formData, transactionType: e.target.value})}
-                  className="input-field"
-                >
-                  <option value="EXPENSE">Expense</option>
-                  <option value="STUDENT_PAYMENT">Student Payment</option>
-                  <option value="DONOR_FUND">Donor Fund</option>
-                  <option value="FUND_RELEASE">Fund Release</option>
-                </select>
-              </div>
-              <div>
-                <label className="block text-sm font-medium text-slate-700 mb-1">Source Vertical</label>
-                <select 
-                  value={formData.source}
-                  onChange={e => setFormData({...formData, source: e.target.value})}
-                  className="input-field"
-                >
-                  <option value="SECRETARIAT">Secretariat</option>
-                  <option value="TRAINING">Training</option>
-                  <option value="CSP">CSP</option>
-                  <option value="SDC">SDC</option>
-                  <option value="FUND_RAISING">Fund Raising</option>
-                  <option value="TBB">TBB</option>
-                </select>
-              </div>
-              <div>
-                <label className="block text-sm font-medium text-slate-700 mb-1">Amount (₹)</label>
-                <input 
-                  type="number" required min="1" 
-                  value={formData.amount} 
-                  onChange={e => setFormData({...formData, amount: e.target.value})}
-                  className="input-field" placeholder="0.00"
-                />
-              </div>
-              <div>
-                <label className="block text-sm font-medium text-slate-700 mb-1">Description</label>
-                <textarea 
-                  value={formData.description}
-                  onChange={e => setFormData({...formData, description: e.target.value})}
-                  className="input-field min-h-[80px]" placeholder="Transaction details..."
-                />
-              </div>
-              <div>
-                <label className="block text-sm font-medium text-slate-700 mb-1">Reference (optional)</label>
-                <input 
-                  type="text"
-                  value={formData.reference}
-                  onChange={e => setFormData({...formData, reference: e.target.value})}
-                  className="input-field" placeholder="e.g. INV-2025-001"
-                />
-              </div>
-              <div className="pt-4 flex space-x-3">
-                <button type="button" onClick={() => setShowModal(false)} className="flex-1 py-2 px-4 border border-slate-200 rounded-lg text-slate-600 font-medium hover:bg-slate-50 transition-colors">
-                  Cancel
-                </button>
-                <button type="submit" className="flex-1 py-2 px-4 rounded-lg text-white font-medium bg-primary-600 hover:bg-primary-700 transition-colors">
-                  Record
-                </button>
-              </div>
-            </form>
-          </div>
-        </div>
-      )}
+
     </div>
   );
 };

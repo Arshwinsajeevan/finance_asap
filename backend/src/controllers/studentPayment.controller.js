@@ -74,7 +74,7 @@ exports.createStudentPayment = async (req, res) => {
       if (data.paidAmount > 0) {
         await tx.transaction.create({
           data: {
-            transactionType: 'STUDENT_PAYMENT',
+            transactionType: 'FEE_COLLECTION',
             source: student.vertical || 'TRAINING',
             amount: data.paidAmount,
             description: `Fee payment for ${data.courseName} by ${student.name}`,
@@ -135,10 +135,10 @@ exports.recordInstallment = async (req, res) => {
 
       await tx.transaction.create({
         data: {
-          transactionType: 'STUDENT_PAYMENT',
+          transactionType: 'FEE_COLLECTION',
           source: payment.student.vertical || 'TRAINING',
           amount: paidAmount,
-          description: `Installment ${payment.installmentNo + 1} for ${payment.courseName} by ${payment.student.name}`,
+          description: `Fee payment for ${payment.courseName} by ${payment.student.name}`,
           reference: reference || p.id.substring(0, 8),
           userId: req.user.userId
         }

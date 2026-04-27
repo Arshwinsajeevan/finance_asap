@@ -41,6 +41,40 @@ const BudgetPage = () => {
 
   const { summary, byVertical } = data;
 
+  const sortedVerticals = [...byVertical].map(budget => {
+    const allocatedAmount = budget.allocated || 0;
+    const usedAmount = budget.used || 0;
+    const remaining = allocatedAmount - usedAmount;
+    const usedPercentage = allocatedAmount > 0 ? (usedAmount / allocatedAmount) * 100 : (usedAmount > 0 ? 100 : 0);
+    const isOverBudget = usedAmount > allocatedAmount;
+    const isNearLimit = usedPercentage >= 90 && !isOverBudget;
+    const exceededAmount = isOverBudget ? usedAmount - allocatedAmount : 0;
+    
+    return {
+      ...budget,
+      allocatedAmount,
+      usedAmount,
+      remaining,
+      usedPercentage,
+      isOverBudget,
+      isNearLimit,
+      exceededAmount
+    };
+  }).sort((a, b) => b.usedPercentage - a.usedPercentage);
+
+  const getProgressBarColor = (percentage) => {
+    if (percentage > 100) return 'bg-red-600';
+    if (percentage > 90) return 'bg-red-500';
+    if (percentage >= 70) return 'bg-yellow-400';
+    return 'bg-emerald-500';
+  };
+
+  const getBadgeStyle = (percentage) => {
+    if (percentage > 100) return 'bg-red-100 text-red-700 border-red-200';
+    if (percentage >= 90) return 'bg-yellow-100 text-yellow-700 border-yellow-200';
+    return 'bg-emerald-100 text-emerald-700 border-emerald-200';
+  };
+
   return (
     <div className="space-y-6 animate-in fade-in slide-in-from-bottom-4 duration-500">
       <div className="flex justify-between items-center">
@@ -102,49 +136,75 @@ const BudgetPage = () => {
       <h3 className="text-lg font-semibold text-slate-800 mt-8 mb-4">Vertical Allocations</h3>
       
       <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-6">
-        {byVertical.map((budget) => (
-          <div key={budget.vertical} className="card-premium p-6 flex flex-col">
+        {sortedVerticals.map((budget) => (
+          <div 
+            key={budget.vertical} 
+            className={`p-6 rounded-xl border shadow-sm transition-all duration-300 ${
+              budget.isOverBudget 
+                ? 'bg-red-50 border-red-500 shadow-red-100/50' 
+                : 'bg-white border-slate-100 hover:shadow-md'
+            }`}
+          >
             <div className="flex justify-between items-start mb-4">
               <div>
                 <h4 className="font-bold text-slate-800 text-lg">{budget.vertical}</h4>
                 <p className="text-xs font-medium text-slate-500">FY {budget.financialYear}</p>
               </div>
-              {budget.isOverExhausted && (
-                <div className="flex items-center text-red-600 bg-red-50 px-2 py-1 rounded-md text-xs font-semibold">
-                  <AlertTriangle className="w-3 h-3 mr-1" />
-                  Over Exhausted
-                </div>
-              )}
+              <div className={`px-2.5 py-1 rounded-full text-xs font-bold border ${getBadgeStyle(budget.usedPercentage)}`}>
+                {Math.round(budget.usedPercentage)}% Used
+              </div>
             </div>
 
-            <div className="flex justify-between text-sm mb-1">
-              <span className="text-slate-500">Used</span>
-              <span className="font-semibold text-slate-800">{formatCurrency(budget.used)}</span>
+            {budget.isOverBudget && (
+              <div className="mb-4 bg-white/60 border border-red-200 rounded-lg p-3 flex items-start space-x-2">
+                <AlertTriangle className="w-4 h-4 text-red-600 mt-0.5 shrink-0" />
+                <div>
+                  <p className="text-sm font-bold text-red-700">Over Budget</p>
+                  <p className="text-xs text-red-600 font-medium">Budget exceeded by {formatCurrency(budget.exceededAmount)}</p>
+                </div>
+              </div>
+            )}
+            
+            {!budget.isOverBudget && budget.isNearLimit && (
+              <div className="mb-4 bg-yellow-50 border border-yellow-200 rounded-lg p-3 flex items-start space-x-2">
+                <AlertTriangle className="w-4 h-4 text-yellow-600 mt-0.5 shrink-0" />
+                <div>
+                  <p className="text-sm font-bold text-yellow-700">Near Limit</p>
+                  <p className="text-xs text-yellow-600 font-medium">Approaching maximum allocation</p>
+                </div>
+              </div>
+            )}
+
+            <div className="flex justify-between text-sm mb-1.5 mt-2">
+              <span className="font-medium text-slate-600">Utilization</span>
+              {budget.usedPercentage > 100 && (
+                <span className="text-xs font-bold text-red-600">+{Math.round(budget.usedPercentage - 100)}% over</span>
+              )}
             </div>
-            <div className="w-full bg-slate-100 rounded-full h-2 mb-4 overflow-hidden">
+            
+            <div className="w-full bg-slate-200/60 rounded-full h-2.5 mb-5 overflow-hidden">
               <div 
-                className={`h-2 rounded-full ${budget.isOverExhausted ? 'bg-red-500' : 'bg-primary-500'}`} 
-                style={{ width: `${Math.min(budget.utilizationPercent, 100)}%` }}
+                className={`h-2.5 rounded-full transition-all duration-1000 ${getProgressBarColor(budget.usedPercentage)}`} 
+                style={{ width: `${Math.min(budget.usedPercentage, 100)}%` }}
               ></div>
             </div>
 
-            <div className="grid grid-cols-2 gap-4 mt-auto pt-4 border-t border-slate-100">
+            <div className="grid grid-cols-3 gap-2 mt-auto pt-4 border-t border-slate-200/60">
               <div>
-                <p className="text-xs text-slate-500 uppercase">Allocated</p>
-                <p className="font-semibold text-slate-800">{formatCurrency(budget.allocated)}</p>
+                <p className="text-[10px] text-slate-500 uppercase font-semibold mb-0.5">Allocated</p>
+                <p className="font-bold text-slate-800 text-sm">{formatCurrency(budget.allocatedAmount)}</p>
               </div>
               <div>
-                <p className="text-xs text-slate-500 uppercase">Remaining</p>
-                <p className={`font-semibold ${budget.isOverExhausted ? 'text-red-600' : 'text-emerald-600'}`}>
-                  {formatCurrency(budget.remaining)}
+                <p className="text-[10px] text-slate-500 uppercase font-semibold mb-0.5">Used</p>
+                <p className="font-bold text-slate-800 text-sm">{formatCurrency(budget.usedAmount)}</p>
+              </div>
+              <div className="text-right">
+                <p className="text-[10px] text-slate-500 uppercase font-semibold mb-0.5">Remaining</p>
+                <p className={`font-bold text-sm ${budget.remaining < 0 ? 'text-red-600' : 'text-emerald-600'}`}>
+                  {budget.remaining < 0 ? '-' : ''}{formatCurrency(Math.abs(budget.remaining))}
                 </p>
               </div>
             </div>
-            {user.role === 'FINANCE_OFFICER' && (
-              <div className="mt-4 flex justify-end">
-                 <button className="text-primary-600 hover:text-primary-700 text-sm font-medium">Manage Allocation</button>
-              </div>
-            )}
           </div>
         ))}
       </div>

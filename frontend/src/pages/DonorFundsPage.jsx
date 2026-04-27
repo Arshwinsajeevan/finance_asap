@@ -8,12 +8,6 @@ const DonorFundsPage = () => {
   const [funds, setFunds] = useState([]);
   const [summary, setSummary] = useState(null);
   const [loading, setLoading] = useState(true);
-  const [showModal, setShowModal] = useState(false);
-
-  const [formData, setFormData] = useState({
-    donorName: '', donorType: 'INDIVIDUAL', amount: '',
-    vertical: '', project: '', purpose: '', reference: ''
-  });
 
   const fetchData = async () => {
     try {
@@ -35,27 +29,6 @@ const DonorFundsPage = () => {
     fetchData();
   }, []);
 
-  const handleCreate = async (e) => {
-    e.preventDefault();
-    try {
-      const payload = {
-        donorName: formData.donorName,
-        donorType: formData.donorType,
-        amount: Number(formData.amount),
-      };
-      if (formData.vertical) payload.vertical = formData.vertical;
-      if (formData.project) payload.project = formData.project;
-      if (formData.purpose) payload.purpose = formData.purpose;
-      if (formData.reference) payload.reference = formData.reference;
-
-      await api.post('/finance/donors', payload);
-      setShowModal(false);
-      setFormData({ donorName: '', donorType: 'INDIVIDUAL', amount: '', vertical: '', project: '', purpose: '', reference: '' });
-      fetchData();
-    } catch (err) {
-      alert('Failed: ' + (err.response?.data?.message || err.message));
-    }
-  };
 
   const formatCurrency = (amount) => {
     return new Intl.NumberFormat('en-IN', {
@@ -79,11 +52,6 @@ const DonorFundsPage = () => {
           <h2 className="text-2xl font-semibold text-slate-800 tracking-tight">Donor Funds</h2>
           <p className="text-sm text-slate-500 mt-1">Track sponsorships and external contributions</p>
         </div>
-        {user.role === 'FINANCE_OFFICER' && (
-          <button onClick={() => setShowModal(true)} className="btn-primary flex items-center">
-            <Plus className="w-4 h-4 mr-2" /> Record Fund
-          </button>
-        )}
       </div>
 
       {summary && (
@@ -168,67 +136,7 @@ const DonorFundsPage = () => {
         </table>
       </div>
 
-      {/* Record Donor Fund Modal */}
-      {showModal && (
-        <div className="fixed inset-0 bg-slate-900/50 flex items-center justify-center z-50 backdrop-blur-sm animate-in fade-in duration-200">
-          <div className="bg-white rounded-xl shadow-2xl w-full max-w-md overflow-hidden animate-in zoom-in-95 duration-200">
-            <div className="px-6 py-4 border-b border-slate-100 flex justify-between items-center bg-slate-50">
-              <h3 className="font-semibold text-slate-800">Record Donor Fund</h3>
-              <button onClick={() => setShowModal(false)} className="text-slate-400 hover:text-slate-600">
-                <X className="w-5 h-5" />
-              </button>
-            </div>
-            <form onSubmit={handleCreate} className="p-6 space-y-4">
-              <div>
-                <label className="block text-sm font-medium text-slate-700 mb-1">Donor Name</label>
-                <input type="text" required value={formData.donorName} onChange={e => setFormData({...formData, donorName: e.target.value})} className="input-field" placeholder="e.g. Infosys Foundation" />
-              </div>
-              <div className="grid grid-cols-2 gap-4">
-                <div>
-                  <label className="block text-sm font-medium text-slate-700 mb-1">Donor Type</label>
-                  <select value={formData.donorType} onChange={e => setFormData({...formData, donorType: e.target.value})} className="input-field">
-                    <option value="INDIVIDUAL">Individual</option>
-                    <option value="CORPORATE">Corporate</option>
-                    <option value="GOVERNMENT">Government</option>
-                  </select>
-                </div>
-                <div>
-                  <label className="block text-sm font-medium text-slate-700 mb-1">Amount (₹)</label>
-                  <input type="number" required min="1" value={formData.amount} onChange={e => setFormData({...formData, amount: e.target.value})} className="input-field" placeholder="0" />
-                </div>
-              </div>
-              <div className="grid grid-cols-2 gap-4">
-                <div>
-                  <label className="block text-sm font-medium text-slate-700 mb-1">Vertical (optional)</label>
-                  <select value={formData.vertical} onChange={e => setFormData({...formData, vertical: e.target.value})} className="input-field">
-                    <option value="">General</option>
-                    <option value="TRAINING">Training</option>
-                    <option value="CSP">CSP</option>
-                    <option value="SDC">SDC</option>
-                    <option value="FUND_RAISING">Fund Raising</option>
-                  </select>
-                </div>
-                <div>
-                  <label className="block text-sm font-medium text-slate-700 mb-1">Project (optional)</label>
-                  <input type="text" value={formData.project} onChange={e => setFormData({...formData, project: e.target.value})} className="input-field" placeholder="e.g. Lab Setup" />
-                </div>
-              </div>
-              <div>
-                <label className="block text-sm font-medium text-slate-700 mb-1">Purpose</label>
-                <input type="text" value={formData.purpose} onChange={e => setFormData({...formData, purpose: e.target.value})} className="input-field" placeholder="e.g. Scholarship Fund" />
-              </div>
-              <div>
-                <label className="block text-sm font-medium text-slate-700 mb-1">Reference (optional)</label>
-                <input type="text" value={formData.reference} onChange={e => setFormData({...formData, reference: e.target.value})} className="input-field" placeholder="e.g. DON-2025-001" />
-              </div>
-              <div className="pt-4 flex space-x-3">
-                <button type="button" onClick={() => setShowModal(false)} className="flex-1 py-2 px-4 border border-slate-200 rounded-lg text-slate-600 font-medium hover:bg-slate-50 transition-colors">Cancel</button>
-                <button type="submit" className="flex-1 py-2 px-4 rounded-lg text-white font-medium bg-primary-600 hover:bg-primary-700 transition-colors">Record Fund</button>
-              </div>
-            </form>
-          </div>
-        </div>
-      )}
+
     </div>
   );
 };

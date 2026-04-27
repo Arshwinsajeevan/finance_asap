@@ -72,12 +72,12 @@ const DashboardLayout = () => {
           <SidebarItem to="/requisitions" icon={FileText} label="Requisitions" />
           <SidebarItem to="/utilisations" icon={ClipboardCheck} label="Utilisation Reports" />
           <SidebarItem to="/transactions" icon={ArrowRightLeft} label="Transactions" />
+          <SidebarItem to="/invoices" icon={Receipt} label="Invoices" />
+          <SidebarItem to="/fee-collections" icon={GraduationCap} label="Fee Collections" />
+          <SidebarItem to="/refunds" icon={RefreshCcw} label="Refunds" />
           <SidebarItem to="/salaries" icon={Users} label="Salaries & Payouts" />
           <SidebarItem to="/donors" icon={HeartHandshake} label="Donor Funds" />
           <SidebarItem to="/bank" icon={Landmark} label="Bank Records" />
-          <SidebarItem to="/fee-collections" icon={GraduationCap} label="Fee Collections" />
-          <SidebarItem to="/refunds" icon={RefreshCcw} label="Refunds" />
-          <SidebarItem to="/invoices" icon={Receipt} label="Invoices" />
           <SidebarItem to="/reports" icon={FileText} label="Financial Reports" />
         </nav>
 

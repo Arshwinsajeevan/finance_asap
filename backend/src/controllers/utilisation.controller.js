@@ -1,5 +1,5 @@
 const prisma = require('../utils/prisma');
-const { sendSuccess, sendError } = require('../utils/response');
+const { success, error } = require('../utils/response');
 
 exports.getUtilisations = async (req, res) => {
   try {
@@ -24,10 +24,10 @@ exports.getUtilisations = async (req, res) => {
       orderBy: { createdAt: 'desc' }
     });
 
-    sendSuccess(res, utilisations, 'Utilisations retrieved successfully');
-  } catch (error) {
-    console.error('Get Utilisations Error:', error);
-    sendError(res, 500, 'Failed to fetch utilisations');
+    return success(res, utilisations, 'Utilisations retrieved successfully');
+  } catch (err) {
+    console.error('Get Utilisations Error:', err);
+    return error(res, 'Failed to fetch utilisations');
   }
 };
 
@@ -51,10 +51,10 @@ exports.getUtilisationSummary = async (req, res) => {
       where
     });
 
-    sendSuccess(res, { totals, byStatus }, 'Utilisation summary retrieved');
-  } catch (error) {
-    console.error('Utilisation Summary Error:', error);
-    sendError(res, 500, 'Failed to fetch utilisation summary');
+    return success(res, { totals, byStatus }, 'Utilisation summary retrieved');
+  } catch (err) {
+    console.error('Utilisation Summary Error:', err);
+    return error(res, 'Failed to fetch utilisation summary');
   }
 };
 
@@ -65,15 +65,15 @@ exports.submitUtilisation = async (req, res) => {
     // Check if requisition exists and belongs to the user's vertical
     const requisition = await prisma.requisition.findUnique({ where: { id: data.requisitionId } });
     if (!requisition) {
-      return sendError(res, 404, 'Requisition not found');
+      return error(res, 'Requisition not found', 404);
     }
 
     if (req.user.role === 'VERTICAL_USER' && requisition.vertical !== req.user.vertical) {
-      return sendError(res, 403, 'You can only submit utilisation for your own vertical');
+      return error(res, 'You can only submit utilisation for your own vertical', 403);
     }
 
     if (requisition.status !== 'FUNDS_RELEASED') {
-      return sendError(res, 400, 'Cannot submit utilisation for unreleased funds');
+      return error(res, 'Cannot submit utilisation for unreleased funds', 400);
     }
 
     const utilisation = await prisma.utilisation.create({
@@ -97,10 +97,10 @@ exports.submitUtilisation = async (req, res) => {
       }
     });
 
-    sendSuccess(res, utilisation, 'Utilisation submitted successfully', 201);
-  } catch (error) {
-    console.error('Submit Utilisation Error:', error);
-    sendError(res, 500, 'Failed to submit utilisation');
+    return success(res, utilisation, 'Utilisation submitted successfully', 201);
+  } catch (err) {
+    console.error('Submit Utilisation Error:', err);
+    return error(res, 'Failed to submit utilisation');
   }
 };
 
@@ -109,36 +109,76 @@ exports.verifyUtilisation = async (req, res) => {
     const { id } = req.params;
     const { status, rejectionNote } = req.body;
 
-    const utilisation = await prisma.utilisation.findUnique({ where: { id } });
-    if (!utilisation) return sendError(res, 404, 'Utilisation record not found');
-    if (utilisation.status !== 'PENDING') return sendError(res, 400, 'Utilisation is already verified or rejected');
-
-    if (status === 'REJECTED' && !rejectionNote) {
-      return sendError(res, 400, 'Rejection note is required');
+    const utilisation = await prisma.utilisation.findUnique({ 
+      where: { id },
+      include: { requisition: true }
+    });
+    
+    if (!utilisation) return error(res, 'Utilisation record not found', 404);
+    if (utilisation.status !== 'PENDING' && utilisation.status !== 'SUBMITTED') {
+      return error(res, 'Utilisation is already verified or rejected', 400);
     }
 
-    const updated = await prisma.utilisation.update({
-      where: { id },
-      data: {
-        status,
-        rejectionNote: status === 'REJECTED' ? rejectionNote : null,
-        verifiedById: req.user.userId
+    if (status === 'REJECTED' && !rejectionNote) {
+      return error(res, 'Rejection note is required', 400);
+    }
+
+    // Validation logic
+    if (status === 'APPROVED' || status === 'VERIFIED') {
+      if (utilisation.amount > utilisation.requisition.releasedAmount) {
+        return error(res, 'Utilisation exceeds released funds', 400);
       }
+    }
+
+    const finalStatus = status === 'VERIFIED' ? 'APPROVED' : status;
+
+    const updated = await prisma.$transaction(async (tx) => {
+      const u = await tx.utilisation.update({
+        where: { id },
+        data: {
+          status: finalStatus,
+          rejectionNote: finalStatus === 'REJECTED' ? rejectionNote : null,
+          verifiedById: req.user.id || req.user.userId
+        }
+      });
+
+      if (finalStatus === 'APPROVED') {
+        // Mark requisition as COMPLETED
+        await tx.requisition.update({
+          where: { id: utilisation.requisitionId },
+          data: { status: 'COMPLETED' }
+        });
+
+        // Create transaction entry for the expense
+        await tx.transaction.create({
+          data: {
+            transactionType: 'EXPENSE',
+            source: utilisation.vertical,
+            amount: utilisation.amount,
+            description: `Utilisation verified: ${utilisation.description}`,
+            reference: utilisation.id,
+            status: 'SUCCESS',
+            userId: req.user.id || req.user.userId
+          }
+        });
+      }
+
+      await tx.auditLog.create({
+        data: {
+          action: 'VERIFY_UTILISATION',
+          entity: 'Utilisation',
+          entityId: id,
+          performedBy: req.user.id || req.user.userId,
+          details: JSON.stringify({ status: finalStatus, rejectionNote })
+        }
+      });
+
+      return u;
     });
 
-    await prisma.auditLog.create({
-      data: {
-        action: 'UPDATE',
-        entity: 'Utilisation',
-        entityId: id,
-        performedBy: req.user.userId,
-        details: JSON.stringify({ status, rejectionNote })
-      }
-    });
-
-    sendSuccess(res, updated, `Utilisation ${status.toLowerCase()} successfully`);
-  } catch (error) {
-    console.error('Verify Utilisation Error:', error);
-    sendError(res, 500, 'Failed to verify utilisation');
+    return success(res, updated, `Utilisation ${finalStatus.toLowerCase()} successfully`);
+  } catch (err) {
+    console.error('Verify Utilisation Error:', err);
+    return error(res, 'Failed to verify utilisation');
   }
 };

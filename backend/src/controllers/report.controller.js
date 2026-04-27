@@ -3,36 +3,49 @@ const { success, error } = require('../utils/response');
 
 const getOverview = async (req, res) => {
   try {
-    const [totalTransactions, totalRequisitions, pendingRequisitions, budgets, salaryTotal, donorTotal, recentTransactions] = await Promise.all([
-      prisma.transaction.aggregate({ _sum: { amount: true }, _count: true }),
-      prisma.requisition.count(),
-      prisma.requisition.count({ where: { status: 'PENDING' } }),
+    const [transactions, requisitions, pendingUtilisation, budgets, recentTransactions] = await Promise.all([
+      prisma.transaction.groupBy({
+        by: ['transactionType'],
+        _sum: { amount: true },
+        where: { status: 'SUCCESS' }
+      }),
+      prisma.requisition.groupBy({
+        by: ['status'],
+        _count: true
+      }),
+      prisma.utilisation.count({ where: { status: 'PENDING' } }),
       prisma.budget.findMany(),
-      prisma.salary.aggregate({ _sum: { amount: true }, where: { status: 'PAID' } }),
-      prisma.donorFund.aggregate({ _sum: { amount: true } }),
       prisma.transaction.findMany({ orderBy: { createdAt: 'desc' }, take: 5, include: { user: { select: { name: true } } } }),
     ]);
 
+    let income = 0;
+    let expenses = 0;
+
+    transactions.forEach(t => {
+      const amt = t._sum.amount || 0;
+      if (['FEE_COLLECTION', 'DONOR_FUND'].includes(t.transactionType)) {
+        income += amt;
+      } else if (['SALARY', 'FUND_RELEASE', 'REFUND', 'INVOICE_PAYMENT'].includes(t.transactionType)) {
+        expenses += amt;
+      }
+    });
+
     const totalAllocated = budgets.reduce((s, b) => s + b.allocated, 0);
-    const totalUsed = budgets.reduce((s, b) => s + b.used, 0);
-    const totalReleased = budgets.reduce((s, b) => s + b.released, 0);
+    const pendingReqCount = requisitions.find(r => r.status === 'PENDING')?._count || 0;
 
     return success(res, {
       stats: {
-        totalFunds: totalAllocated,
-        fundsSpent: totalUsed,
-        fundsRemaining: totalAllocated - totalUsed,
-        fundsReleased: totalReleased,
-        pendingRequisitions,
-        totalRequisitions,
-        totalTransactions: totalTransactions._count,
-        transactionVolume: totalTransactions._sum.amount || 0,
-        salariesPaid: salaryTotal._sum.amount || 0,
-        donorFunds: donorTotal._sum.amount || 0,
+        totalBudget: totalAllocated,
+        totalIncome: income,
+        totalExpenses: expenses,
+        netBalance: income - expenses,
+        pendingRequisitions: pendingReqCount,
+        pendingUtilisation
       },
       recentTransactions,
     });
   } catch (err) {
+    console.error('Overview Error:', err);
     return error(res, 'Failed to get overview');
   }
 };
@@ -40,18 +53,42 @@ const getOverview = async (req, res) => {
 const getAnnualReport = async (req, res) => {
   try {
     const { year } = req.query;
-    const fy = year || '2025-26';
-
-    const [budgets, transactions, salaries, donors, requisitions] = await Promise.all([
-      prisma.budget.findMany({ where: { financialYear: fy } }),
-      prisma.transaction.groupBy({ by: ['transactionType'], _sum: { amount: true }, _count: true }),
-      prisma.salary.aggregate({ _sum: { amount: true }, _count: true, where: { status: 'PAID' } }),
-      prisma.donorFund.aggregate({ _sum: { amount: true }, _count: true }),
-      prisma.requisition.groupBy({ by: ['status'], _count: true }),
+    // We could filter transactions by year, but for now we fetch all or filter by date
+    
+    const [transactions, budgets] = await Promise.all([
+      prisma.transaction.groupBy({
+        by: ['transactionType'],
+        _sum: { amount: true },
+        where: { status: 'SUCCESS' }
+      }),
+      prisma.budget.findMany()
     ]);
 
-    return success(res, { financialYear: fy, budgets, transactions, salaries, donors, requisitions });
+    let income = { fees: 0, donors: 0, total: 0 };
+    let expenses = { salaries: 0, requisitions: 0, refunds: 0, total: 0 };
+
+    transactions.forEach(t => {
+      const amt = t._sum.amount || 0;
+      if (t.transactionType === 'FEE_COLLECTION') income.fees += amt;
+      else if (t.transactionType === 'DONOR_FUND') income.donors += amt;
+      else if (t.transactionType === 'SALARY') expenses.salaries += amt;
+      else if (t.transactionType === 'FUND_RELEASE') expenses.requisitions += amt;
+      else if (t.transactionType === 'REFUND') expenses.refunds += amt;
+      // Other types like EXPENSE (internal tracking) can be mapped if needed
+      // Currently requisitions cover vertical expenses via FUND_RELEASE.
+    });
+
+    income.total = income.fees + income.donors;
+    expenses.total = expenses.salaries + expenses.requisitions + expenses.refunds;
+
+    return success(res, {
+      income,
+      expenses,
+      netBalance: income.total - expenses.total,
+      budgets
+    });
   } catch (err) {
+    console.error('Annual Report Error:', err);
     return error(res, 'Failed to generate report');
   }
 };

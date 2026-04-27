@@ -123,24 +123,6 @@ const approveRequisition = async (req, res) => {
       },
     });
 
-    // Update budget allocation
-    await prisma.budget.upsert({
-      where: {
-        vertical_financialYear: {
-          vertical: existing.vertical,
-          financialYear: existing.financialYear,
-        },
-      },
-      update: {
-        allocated: { increment: approvedAmount },
-      },
-      create: {
-        vertical: existing.vertical,
-        financialYear: existing.financialYear,
-        allocated: approvedAmount,
-      },
-    });
-
     await prisma.auditLog.create({
       data: {
         action: 'APPROVE',
@@ -218,10 +200,25 @@ const releaseFunds = async (req, res) => {
       return error(res, 'Released amount cannot exceed approved amount', 400);
     }
 
+    // Check budget
+    const budget = await prisma.budget.findUnique({
+      where: {
+        vertical_financialYear: {
+          vertical: existing.vertical,
+          financialYear: existing.financialYear,
+        },
+      },
+    });
+    
+    const available = budget ? budget.allocated - budget.released : 0;
+    if (available < releasedAmount) {
+      return error(res, 'Insufficient budget', 400);
+    }
+
     const requisition = await prisma.requisition.update({
       where: { id },
       data: {
-        status: 'FUNDS_RELEASED',
+        status: 'UTILISATION_PENDING',
         releasedAmount,
       },
       include: {
@@ -259,7 +256,7 @@ const releaseFunds = async (req, res) => {
         action: 'UPDATE',
         entity: 'Requisition',
         entityId: id,
-        details: JSON.stringify({ releasedAmount, action: 'FUNDS_RELEASED' }),
+        details: JSON.stringify({ releasedAmount, action: 'FUNDS_RELEASED_UTILISATION_PENDING' }),
         performedBy: req.user.id,
       },
     });
