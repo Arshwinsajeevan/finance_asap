@@ -3,7 +3,7 @@ const { success, error } = require('../utils/response');
 
 const getOverview = async (req, res) => {
   try {
-    const [transactions, requisitions, pendingUtilisation, budgets, recentTransactions] = await Promise.all([
+    const [transactions, requisitions, pendingUtilisation, budgets, recentTransactions, totalTransactions, topReceivables, topPayables] = await Promise.all([
       prisma.transaction.groupBy({
         by: ['transactionType'],
         _sum: { amount: true },
@@ -16,32 +16,90 @@ const getOverview = async (req, res) => {
       prisma.utilisation.count({ where: { status: 'PENDING' } }),
       prisma.budget.findMany(),
       prisma.transaction.findMany({ orderBy: { createdAt: 'desc' }, take: 5, include: { user: { select: { name: true } } } }),
+      prisma.transaction.count(),
+      prisma.studentPayment.findMany({ 
+        where: { status: { in: ['PENDING', 'PARTIAL'] } },
+        orderBy: { createdAt: 'asc' },
+        take: 5,
+        include: { student: { select: { name: true } } }
+      }),
+      prisma.requisition.findMany({
+        where: { status: 'PENDING' },
+        orderBy: { createdAt: 'desc' },
+        take: 5,
+        include: { raisedBy: { select: { name: true } } }
+      })
     ]);
 
     let income = 0;
     let expenses = 0;
+    
+    let revenueSplit = { fees: 0, donors: 0, other: 0 };
+    let expenseSplit = { salaries: 0, requisitions: 0, refunds: 0, other: 0 };
 
     transactions.forEach(t => {
       const amt = t._sum.amount || 0;
-      if (['FEE_COLLECTION', 'DONOR_FUND'].includes(t.transactionType)) {
-        income += amt;
-      } else if (['SALARY', 'FUND_RELEASE', 'REFUND', 'INVOICE_PAYMENT'].includes(t.transactionType)) {
-        expenses += amt;
+      if (t.transactionType === 'FEE_COLLECTION') {
+        income += amt; revenueSplit.fees += amt;
+      } else if (t.transactionType === 'DONOR_FUND') {
+        income += amt; revenueSplit.donors += amt;
+      } else if (t.transactionType === 'SALARY') {
+        expenses += amt; expenseSplit.salaries += amt;
+      } else if (t.transactionType === 'FUND_RELEASE') {
+        expenses += amt; expenseSplit.requisitions += amt;
+      } else if (t.transactionType === 'REFUND') {
+        expenses += amt; expenseSplit.refunds += amt;
+      } else if (t.transactionType === 'INVOICE_PAYMENT') {
+        expenses += amt; expenseSplit.other += amt;
       }
     });
 
     const totalAllocated = budgets.reduce((s, b) => s + b.allocated, 0);
+    const totalUsed = budgets.reduce((s, b) => s + b.used, 0);
     const pendingReqCount = requisitions.find(r => r.status === 'PENDING')?._count || 0;
+    
+    // Process Receivables and Payables
+    const formattedReceivables = topReceivables.map(r => ({
+      id: r.id,
+      client: r.student.name,
+      amount: r.totalFee - r.paidAmount,
+      dueDate: r.createdAt,
+      status: r.status
+    }));
+
+    const formattedPayables = topPayables.map(r => ({
+      id: r.id,
+      vendor: r.purpose,
+      amount: r.amount,
+      date: r.createdAt,
+      status: r.status
+    }));
+
+    const overBudgetVerticals = budgets.filter(b => b.used > b.allocated).map(b => b.vertical);
+    const openingBalance = 15000000; // Mock opening balance
 
     return success(res, {
       stats: {
         totalBudget: totalAllocated,
+        budgetUsed: totalUsed,
+        budgetRemaining: totalAllocated - totalUsed,
         totalIncome: income,
         totalExpenses: expenses,
         netBalance: income - expenses,
         pendingRequisitions: pendingReqCount,
-        pendingUtilisation
+        pendingUtilisation,
+        totalTransactions,
+        openingBalance,
+        totalInflow: income,
+        totalOutflow: expenses,
+        closingBalance: openingBalance + income - expenses,
+        overBudgetAlerts: overBudgetVerticals
       },
+      revenueSplit,
+      expenseSplit,
+      topReceivables: formattedReceivables,
+      topPayables: formattedPayables,
+      budgets,
       recentTransactions,
     });
   } catch (err) {
