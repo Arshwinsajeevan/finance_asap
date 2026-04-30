@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import api from '../api/axios';
 import { useAuth } from '../context/AuthContext';
-import { Landmark, FileText, ShieldAlert, Plus, Calendar, X } from 'lucide-react';
+import { Landmark, FileText, ShieldAlert, Plus, Calendar, X, Wallet, Coins, Clock } from 'lucide-react';
 
 const BankRecordsPage = () => {
   const { user } = useAuth();
@@ -74,13 +74,16 @@ const BankRecordsPage = () => {
   const activeFDs = records.filter(r => r.entryType === 'FD' && r.status === 'ACTIVE');
   const activeGuarantees = records.filter(r => r.entryType === 'BANK_GUARANTEE' && r.status === 'ACTIVE');
   const activeEMDs = records.filter(r => r.entryType === 'EMD' && r.status === 'ACTIVE');
+  const pettyCashTotal = records.filter(r => r.entryType === 'PETTY_CASH').reduce((s, r) => s + r.amount, 0);
+  const imprestTotal = records.filter(r => r.entryType === 'IMPREST').reduce((s, r) => s + r.amount, 0);
+  const arrearsTotal = records.filter(r => r.entryType === 'ARREARS').reduce((s, r) => s + r.amount, 0);
 
   return (
     <div className="space-y-6 animate-in fade-in slide-in-from-bottom-4 duration-500">
       <div className="flex justify-between items-center">
         <div>
-          <h2 className="text-2xl font-semibold text-slate-800 tracking-tight">Bank & Guarantees</h2>
-          <p className="text-sm text-slate-500 mt-1">Manage EMDs, Bank Guarantees, and Statements</p>
+          <h2 className="text-2xl font-semibold text-slate-800 tracking-tight">Bank & Ledgers</h2>
+          <p className="text-sm text-slate-500 mt-1">Manage EMDs, FDs, Petty Cash, Imprest, and Arrears</p>
         </div>
         {user.role === 'FINANCE_OFFICER' && (
           <button onClick={() => setShowModal(true)} className="btn-primary flex items-center">
@@ -89,41 +92,65 @@ const BankRecordsPage = () => {
         )}
       </div>
 
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
-        <div className="card-premium p-5 flex items-center">
-          <div className="p-3 bg-blue-100 text-blue-600 rounded-xl mr-4"><Landmark className="w-6 h-6" /></div>
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-2">
+        <div className="card-premium p-4 flex items-center">
+          <div className="p-3 bg-blue-100 text-blue-600 rounded-xl mr-4"><Landmark className="w-5 h-5" /></div>
           <div>
-            <p className="text-sm font-medium text-slate-500">Active FDs</p>
-            <h3 className="text-xl font-bold text-slate-800">{activeFDs.length} — {formatCurrency(activeFDs.reduce((s, r) => s + r.amount, 0))}</h3>
+            <p className="text-xs font-bold text-slate-500 uppercase tracking-wider">Active FDs</p>
+            <h3 className="text-lg font-black text-slate-800">{activeFDs.length} — {formatCurrency(activeFDs.reduce((s, r) => s + r.amount, 0))}</h3>
           </div>
         </div>
-        <div className="card-premium p-5 flex items-center border-l-4 border-l-amber-500">
-          <div className="p-3 bg-amber-100 text-amber-600 rounded-xl mr-4"><ShieldAlert className="w-6 h-6" /></div>
+        <div className="card-premium p-4 flex items-center border-l-4 border-l-amber-500">
+          <div className="p-3 bg-amber-100 text-amber-600 rounded-xl mr-4"><ShieldAlert className="w-5 h-5" /></div>
           <div>
-            <p className="text-sm font-medium text-slate-500">Active Guarantees</p>
-            <h3 className="text-xl font-bold text-slate-800">{activeGuarantees.length}</h3>
+            <p className="text-xs font-bold text-slate-500 uppercase tracking-wider">Active Guarantees</p>
+            <h3 className="text-lg font-black text-slate-800">{activeGuarantees.length} Records</h3>
           </div>
         </div>
-        <div className="card-premium p-5 flex items-center border-l-4 border-l-emerald-500">
-          <div className="p-3 bg-emerald-100 text-emerald-600 rounded-xl mr-4"><FileText className="w-6 h-6" /></div>
+        <div className="card-premium p-4 flex items-center border-l-4 border-l-emerald-500">
+          <div className="p-3 bg-emerald-100 text-emerald-600 rounded-xl mr-4"><FileText className="w-5 h-5" /></div>
           <div>
-            <p className="text-sm font-medium text-slate-500">Active EMDs</p>
-            <h3 className="text-xl font-bold text-slate-800">{activeEMDs.length}</h3>
+            <p className="text-xs font-bold text-slate-500 uppercase tracking-wider">Active EMDs</p>
+            <h3 className="text-lg font-black text-slate-800">{activeEMDs.length} Records</h3>
+          </div>
+        </div>
+      </div>
+
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
+        <div className="card-premium p-4 flex items-center bg-teal-50 border border-teal-100">
+          <div className="p-3 bg-teal-100 text-teal-600 rounded-xl mr-4"><Wallet className="w-5 h-5" /></div>
+          <div>
+            <p className="text-xs font-bold text-teal-700 uppercase tracking-wider">Petty Cash Balance</p>
+            <h3 className="text-lg font-black text-teal-900">{formatCurrency(pettyCashTotal)}</h3>
+          </div>
+        </div>
+        <div className="card-premium p-4 flex items-center bg-indigo-50 border border-indigo-100">
+          <div className="p-3 bg-indigo-100 text-indigo-600 rounded-xl mr-4"><Coins className="w-5 h-5" /></div>
+          <div>
+            <p className="text-xs font-bold text-indigo-700 uppercase tracking-wider">Total Imprest</p>
+            <h3 className="text-lg font-black text-indigo-900">{formatCurrency(imprestTotal)}</h3>
+          </div>
+        </div>
+        <div className="card-premium p-4 flex items-center bg-rose-50 border border-rose-100">
+          <div className="p-3 bg-rose-100 text-rose-600 rounded-xl mr-4"><Clock className="w-5 h-5" /></div>
+          <div>
+            <p className="text-xs font-bold text-rose-700 uppercase tracking-wider">Pending Arrears</p>
+            <h3 className="text-lg font-black text-rose-900">{formatCurrency(arrearsTotal)}</h3>
           </div>
         </div>
       </div>
 
       <div className="card-premium">
         <div className="px-6 py-4 border-b border-slate-100 bg-slate-50/50 rounded-t-xl">
-          <div className="flex space-x-2">
-            {['ALL', 'EMD', 'BANK_GUARANTEE', 'FD', 'STATEMENT'].map(type => (
+          <div className="flex space-x-2 overflow-x-auto pb-2">
+            {['ALL', 'EMD', 'BANK_GUARANTEE', 'FD', 'STATEMENT', 'PETTY_CASH', 'IMPREST', 'ARREARS'].map(type => (
               <button
                 key={type}
                 onClick={() => setActiveTab(type)}
-                className={`px-4 py-1.5 rounded-md text-sm font-medium transition-colors ${
+                className={`px-4 py-1.5 rounded-md text-xs font-bold transition-colors whitespace-nowrap ${
                   activeTab === type 
                     ? 'bg-white text-primary-600 shadow-sm border border-slate-200' 
-                    : 'text-slate-600 hover:bg-slate-200/50'
+                    : 'text-slate-500 hover:text-slate-700 hover:bg-slate-200/50'
                 }`}
               >
                 {type.replace('_', ' ')}
@@ -201,6 +228,9 @@ const BankRecordsPage = () => {
                     <option value="EMD">EMD</option>
                     <option value="BANK_GUARANTEE">Bank Guarantee</option>
                     <option value="FD">Fixed Deposit</option>
+                    <option value="PETTY_CASH">Petty Cash</option>
+                    <option value="IMPREST">Imprest</option>
+                    <option value="ARREARS">Arrears</option>
                     <option value="STATEMENT">Statement</option>
                   </select>
                 </div>

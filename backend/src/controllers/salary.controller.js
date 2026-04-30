@@ -1,14 +1,66 @@
 const prisma = require('../utils/prisma');
 const { success, error, paginated } = require('../utils/response');
 
+/**
+ * POST /api/finance/salaries
+ * Accepts grossAmount and auto-computes PF/TDS deductions server-side.
+ *   - EMPLOYEE: 12% PF deduction
+ *   - TRAINER / MENTOR: 10% TDS deduction
+ *   - AGENT: no deductions (commission-based)
+ * Stores the net payable as `amount`.
+ */
 const createSalary = async (req, res) => {
   try {
-    const salary = await prisma.salary.create({ data: req.body });
-    await prisma.auditLog.create({
-      data: { action: 'CREATE', entity: 'Salary', entityId: salary.id, details: JSON.stringify(req.body), performedBy: req.user.id },
+    const { grossAmount, employeeType, ...rest } = req.body;
+
+    // ── Server-side tax computation ──
+    let pfAmount = 0;
+    let tdsAmount = 0;
+
+    if (employeeType === 'EMPLOYEE') {
+      pfAmount = Math.round(grossAmount * 0.12 * 100) / 100; // 12% PF
+    } else if (employeeType === 'TRAINER' || employeeType === 'MENTOR') {
+      tdsAmount = Math.round(grossAmount * 0.10 * 100) / 100; // 10% TDS
+    }
+    // AGENT: no deductions — commission-based
+
+    const netPayable = grossAmount - pfAmount - tdsAmount;
+
+    // ── Atomic: Create Salary + Audit Log ──
+    const salary = await prisma.$transaction(async (tx) => {
+      const record = await tx.salary.create({
+        data: {
+          ...rest,
+          employeeType,
+          amount: netPayable,
+          pfAmount,
+          tdsAmount,
+        },
+      });
+
+      await tx.auditLog.create({
+        data: {
+          action: 'CREATE',
+          entity: 'Salary',
+          entityId: record.id,
+          details: JSON.stringify({
+            grossAmount,
+            pfAmount,
+            tdsAmount,
+            netPayable,
+            employeeType,
+            month: rest.month,
+          }),
+          performedBy: req.user.id,
+        },
+      });
+
+      return record;
     });
-    return success(res, salary, 'Salary record created', 201);
+
+    return success(res, { ...salary, grossAmount }, 'Salary record created', 201);
   } catch (err) {
+    console.error('Create salary error:', err);
     return error(res, 'Failed to create salary record');
   }
 };
@@ -46,28 +98,69 @@ const getSalarySummary = async (req, res) => {
   }
 };
 
+/**
+ * PATCH /api/finance/salaries/:id/pay
+ * ATOMIC TRANSACTION: All 3 operations happen together or none do.
+ *   1. Update Salary status → PAID
+ *   2. Create SALARY entry in the Transaction ledger
+ *   3. Write to AuditLog
+ */
 const markSalaryPaid = async (req, res) => {
   try {
     const existing = await prisma.salary.findUnique({ where: { id: req.params.id } });
-    if (!existing) return error(res, 'Not found', 404);
-    if (existing.status === 'PAID') return error(res, 'Already paid', 400);
+    if (!existing) return error(res, 'Salary record not found', 404);
+    if (existing.status === 'PAID') return error(res, 'Already marked as paid', 400);
 
-    const salary = await prisma.salary.update({
-      where: { id: req.params.id },
-      data: { status: 'PAID', paymentDate: new Date(), reference: req.body.reference || null },
+    const salary = await prisma.$transaction(async (tx) => {
+      // 1. Update salary status
+      const updated = await tx.salary.update({
+        where: { id: req.params.id },
+        data: {
+          status: 'PAID',
+          paymentDate: new Date(),
+          reference: req.body.reference || null,
+        },
+      });
+
+      // 2. Write to the central Transaction ledger
+      await tx.transaction.create({
+        data: {
+          transactionType: 'SALARY',
+          source: existing.vertical || 'SECRETARIAT',
+          amount: existing.amount,
+          description: `Salary: ${existing.employeeName} (${existing.employeeType}) - ${existing.month}`,
+          status: 'SUCCESS',
+          userId: req.user.id,
+        },
+      });
+
+      // 3. Write to AuditLog
+      await tx.auditLog.create({
+        data: {
+          action: 'SALARY_PAID',
+          entity: 'Salary',
+          entityId: existing.id,
+          details: JSON.stringify({
+            employeeName: existing.employeeName,
+            employeeType: existing.employeeType,
+            netPaid: existing.amount,
+            pfAmount: existing.pfAmount,
+            tdsAmount: existing.tdsAmount,
+            month: existing.month,
+          }),
+          performedBy: req.user.id,
+        },
+      });
+
+      return updated;
     });
 
-    await prisma.transaction.create({
-      data: {
-        transactionType: 'SALARY', source: existing.vertical || 'SECRETARIAT', amount: existing.amount,
-        description: `Salary: ${existing.employeeName} (${existing.employeeType}) - ${existing.month}`,
-        status: 'SUCCESS', userId: existing.userId,
-      },
-    });
-    return success(res, salary, 'Salary marked as paid');
+    return success(res, salary, 'Salary marked as paid — ledger updated');
   } catch (err) {
+    console.error('Mark salary paid error:', err);
     return error(res, 'Failed to update salary');
   }
 };
 
 module.exports = { createSalary, getSalaries, getSalarySummary, markSalaryPaid };
+

@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import api from '../api/axios';
 import { useAuth } from '../context/AuthContext';
-import { Search, Users, Briefcase, Award, Headphones, CheckCircle2, Plus, X } from 'lucide-react';
+import { Search, Users, Briefcase, Award, Headphones, CheckCircle2, Plus, X, ShieldCheck } from 'lucide-react';
 
 const SalariesPage = () => {
   const { user } = useAuth();
@@ -16,6 +16,13 @@ const SalariesPage = () => {
     employeeName: '', employeeType: 'EMPLOYEE', amount: '', commission: '0',
     month: '', vertical: 'SECRETARIAT'
   });
+
+  // Taxation Engine Calculations
+  const grossAmount = Number(formData.amount) || 0;
+  const isEmployee = formData.employeeType === 'EMPLOYEE';
+  const pfDeduction = isEmployee ? grossAmount * 0.12 : 0; // 12% PF for regular employees
+  const tdsDeduction = !isEmployee ? grossAmount * 0.10 : 0; // 10% TDS for contractors/trainers
+  const netPayable = grossAmount - pfDeduction - tdsDeduction + (Number(formData.commission) || 0);
 
   const fetchSalaries = async () => {
     try {
@@ -53,7 +60,7 @@ const SalariesPage = () => {
     try {
       await api.post('/finance/salaries', {
         ...formData,
-        amount: Number(formData.amount),
+        amount: netPayable, // Store Net Payable after deductions
         commission: Number(formData.commission) || 0,
       });
       setShowModal(false);
@@ -255,7 +262,7 @@ const SalariesPage = () => {
               </div>
               <div className="grid grid-cols-2 gap-4">
                 <div>
-                  <label className="block text-sm font-medium text-slate-700 mb-1">Amount (₹)</label>
+                  <label className="block text-sm font-medium text-slate-700 mb-1">Gross Amount (₹)</label>
                   <input type="number" required min="1" value={formData.amount} onChange={e => setFormData({...formData, amount: e.target.value})} className="input-field" placeholder="0" />
                 </div>
                 <div>
@@ -263,9 +270,44 @@ const SalariesPage = () => {
                   <input type="number" min="0" value={formData.commission} onChange={e => setFormData({...formData, commission: e.target.value})} className="input-field" placeholder="0" />
                 </div>
               </div>
+              
+              {/* Taxation Engine Widget */}
+              {grossAmount > 0 && (
+                <div className="bg-slate-50 border border-slate-200 rounded-lg p-4 space-y-2">
+                  <div className="flex justify-between items-center text-xs font-semibold text-slate-600 uppercase tracking-wider mb-2">
+                    <span className="flex items-center"><ShieldCheck className="w-4 h-4 mr-1 text-indigo-500"/> Taxation Engine</span>
+                  </div>
+                  <div className="flex justify-between items-center text-sm">
+                    <span className="text-slate-600">Gross Amount</span>
+                    <span className="font-medium text-slate-800">{formatCurrency(grossAmount)}</span>
+                  </div>
+                  {isEmployee ? (
+                    <div className="flex justify-between items-center text-sm">
+                      <span className="text-slate-600">PF Deduction (12%)</span>
+                      <span className="font-medium text-rose-600">-{formatCurrency(pfDeduction)}</span>
+                    </div>
+                  ) : (
+                    <div className="flex justify-between items-center text-sm">
+                      <span className="text-slate-600">TDS Deduction (10%)</span>
+                      <span className="font-medium text-rose-600">-{formatCurrency(tdsDeduction)}</span>
+                    </div>
+                  )}
+                  {Number(formData.commission) > 0 && (
+                    <div className="flex justify-between items-center text-sm">
+                      <span className="text-slate-600">Commission</span>
+                      <span className="font-medium text-emerald-600">+{formatCurrency(Number(formData.commission))}</span>
+                    </div>
+                  )}
+                  <div className="pt-2 mt-2 border-t border-slate-200 flex justify-between items-center">
+                    <span className="text-sm font-bold text-slate-800">Net Payable</span>
+                    <span className="text-lg font-black text-emerald-600">{formatCurrency(netPayable)}</span>
+                  </div>
+                </div>
+              )}
+
               <div>
-                <label className="block text-sm font-medium text-slate-700 mb-1">Month</label>
-                <input type="text" required value={formData.month} onChange={e => setFormData({...formData, month: e.target.value})} className="input-field" placeholder="e.g. April 2025" />
+                <label className="block text-sm font-medium text-slate-700 mb-1">Payroll Month</label>
+                <input type="month" required value={formData.month} onChange={e => setFormData({...formData, month: e.target.value})} className="input-field" />
               </div>
               <div className="pt-4 flex space-x-3">
                 <button type="button" onClick={() => setShowModal(false)} className="flex-1 py-2 px-4 border border-slate-200 rounded-lg text-slate-600 font-medium hover:bg-slate-50 transition-colors">Cancel</button>

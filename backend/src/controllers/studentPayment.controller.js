@@ -1,5 +1,5 @@
 const prisma = require('../utils/prisma');
-const { sendSuccess, sendError } = require('../utils/response');
+const { success, error } = require('../utils/response');
 
 exports.getStudentPayments = async (req, res) => {
   try {
@@ -18,10 +18,10 @@ exports.getStudentPayments = async (req, res) => {
       orderBy: { createdAt: 'desc' }
     });
 
-    sendSuccess(res, payments, 'Student payments retrieved successfully');
+    return success(res, payments, 'Student payments retrieved successfully');
   } catch (error) {
     console.error('Get Student Payments Error:', error);
-    sendError(res, 500, 'Failed to fetch student payments');
+    return error(res, 'Failed to fetch student payments');
   }
 };
 
@@ -39,10 +39,10 @@ exports.getStudentPaymentSummary = async (req, res) => {
       _sum: { totalFee: true, paidAmount: true }
     });
 
-    sendSuccess(res, { totals, byStatus }, 'Student payment summary retrieved');
+    return success(res, { totals, byStatus }, 'Student payment summary retrieved');
   } catch (error) {
     console.error('Student Payment Summary Error:', error);
-    sendError(res, 500, 'Failed to fetch payment summary');
+    return error(res, 'Failed to fetch payment summary');
   }
 };
 
@@ -53,7 +53,7 @@ exports.createStudentPayment = async (req, res) => {
     // Check if student exists
     const student = await prisma.user.findUnique({ where: { id: data.studentId } });
     if (!student) {
-      return sendError(res, 404, 'Student not found');
+      return error(res, 'Student not found', 404);
     }
 
     let status = 'PENDING';
@@ -97,10 +97,10 @@ exports.createStudentPayment = async (req, res) => {
       return newPayment;
     });
 
-    sendSuccess(res, payment, 'Student payment record created', 201);
+    return success(res, payment, 'Student payment record created', 201);
   } catch (error) {
     console.error('Create Student Payment Error:', error);
-    sendError(res, 500, 'Failed to create student payment');
+    return error(res, 'Failed to create student payment');
   }
 };
 
@@ -114,8 +114,8 @@ exports.recordInstallment = async (req, res) => {
       include: { student: true }
     });
 
-    if (!payment) return sendError(res, 404, 'Payment record not found');
-    if (payment.status === 'PAID') return sendError(res, 400, 'Fee already fully paid');
+    if (!payment) return error(res, 'Payment record not found', 404);
+    if (payment.status === 'PAID') return error(res, 'Fee already fully paid', 400);
 
     const newTotalPaid = payment.paidAmount + paidAmount;
     let status = 'PARTIAL';
@@ -157,10 +157,10 @@ exports.recordInstallment = async (req, res) => {
       return p;
     });
 
-    sendSuccess(res, updated, 'Installment recorded successfully');
+    return success(res, updated, 'Installment recorded successfully');
   } catch (error) {
     console.error('Record Installment Error:', error);
-    sendError(res, 500, 'Failed to record installment');
+    return error(res, 'Failed to record installment');
   }
 };
 
@@ -174,9 +174,9 @@ exports.issueRefund = async (req, res) => {
       include: { student: true }
     });
 
-    if (!payment) return sendError(res, 404, 'Payment record not found');
+    if (!payment) return error(res, 'Payment record not found', 404);
     if (payment.paidAmount < refundAmount) {
-      return sendError(res, 400, 'Refund amount cannot exceed paid amount');
+      return error(res, 'Refund amount cannot exceed paid amount', 400);
     }
 
     const updated = await prisma.$transaction(async (tx) => {
@@ -214,9 +214,9 @@ exports.issueRefund = async (req, res) => {
       return p;
     });
 
-    sendSuccess(res, updated, 'Refund processed successfully');
+    return success(res, updated, 'Refund processed successfully');
   } catch (error) {
     console.error('Issue Refund Error:', error);
-    sendError(res, 500, 'Failed to issue refund');
+    return error(res, 'Failed to issue refund');
   }
 };

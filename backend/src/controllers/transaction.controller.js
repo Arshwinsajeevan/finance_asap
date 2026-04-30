@@ -2,31 +2,11 @@ const prisma = require('../utils/prisma');
 const { success, error, paginated } = require('../utils/response');
 
 /**
- * POST /api/finance/transactions
+ * IMPORTANT: The Transaction table is an append-only financial ledger.
+ * There is NO public create/update/delete endpoint.
+ * Transactions are ONLY created internally by other controllers
+ * (salary, requisition, refund, invoice, donor) inside prisma.$transaction blocks.
  */
-const createTransaction = async (req, res) => {
-  try {
-    const transaction = await prisma.transaction.create({
-      data: req.body,
-    });
-
-    // Audit log
-    await prisma.auditLog.create({
-      data: {
-        action: 'CREATE',
-        entity: 'Transaction',
-        entityId: transaction.id,
-        details: JSON.stringify(req.body),
-        performedBy: req.user.id,
-      },
-    });
-
-    return success(res, transaction, 'Transaction created successfully', 201);
-  } catch (err) {
-    console.error('Create transaction error:', err);
-    return error(res, 'Failed to create transaction');
-  }
-};
 
 /**
  * GET /api/finance/transactions
@@ -118,4 +98,4 @@ const getTransactionSummary = async (req, res) => {
   }
 };
 
-module.exports = { createTransaction, getTransactions, getTransaction, getTransactionSummary };
+module.exports = { getTransactions, getTransaction, getTransactionSummary };

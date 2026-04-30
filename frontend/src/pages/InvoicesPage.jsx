@@ -16,7 +16,9 @@ const InvoicesPage = () => {
     clientName: '',
     baseAmount: '',
     gstPercent: 0,
-    description: ''
+    description: '',
+    panGstin: '',
+    tdsPercent: 0
   });
 
   const fetchData = async () => {
@@ -43,9 +45,10 @@ const InvoicesPage = () => {
         ...formData,
         baseAmount: Number(formData.baseAmount),
         gstPercent: Number(formData.gstPercent)
+        // Additional fields would be mapped here when backend supports it
       });
       setShowCreateModal(false);
-      setFormData({ vertical: 'TRAINING', clientName: '', baseAmount: '', gstPercent: 0, description: '' });
+      setFormData({ vertical: 'TRAINING', clientName: '', baseAmount: '', gstPercent: 0, description: '', panGstin: '', tdsPercent: 0 });
       fetchData();
     } catch (err) {
       alert('Failed: ' + (err.response?.data?.message || err.message));
@@ -92,6 +95,10 @@ const InvoicesPage = () => {
   const formGstPct = Number(formData.gstPercent) || 0;
   const formGstAmt = (formBase * formGstPct) / 100;
   const formTotal = formBase + formGstAmt;
+  const formTdsAmt = (formBase * (Number(formData.tdsPercent) || 0)) / 100;
+  const netReceivable = formTotal - formTdsAmt;
+  
+  const isPanGstValid = formData.panGstin.length === 10 || formData.panGstin.length === 15 || formData.panGstin.length === 0;
 
   return (
     <div className="space-y-6 animate-in fade-in slide-in-from-bottom-4 duration-500">
@@ -231,6 +238,33 @@ const InvoicesPage = () => {
                 </div>
               </div>
 
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <label className="block text-sm font-bold text-slate-700 mb-1">PAN / GSTIN</label>
+                  <input 
+                    type="text" 
+                    value={formData.panGstin} 
+                    onChange={e => setFormData({...formData, panGstin: e.target.value.toUpperCase()})} 
+                    className={`input-field font-mono uppercase ${!isPanGstValid && formData.panGstin.length > 0 ? 'border-red-400 focus:border-red-500 focus:ring-red-500' : ''}`} 
+                    placeholder="10-digit PAN or 15-digit GSTIN" 
+                    maxLength={15}
+                  />
+                  {!isPanGstValid && formData.panGstin.length > 0 && <p className="text-[10px] text-red-500 mt-1">Invalid length. Must be 10 (PAN) or 15 (GSTIN) chars.</p>}
+                </div>
+                <div>
+                  <label className="block text-sm font-bold text-slate-700 mb-1">TDS Deduction %</label>
+                  <select 
+                    className="input-field" 
+                    value={formData.tdsPercent} 
+                    onChange={e => setFormData({...formData, tdsPercent: e.target.value})}
+                  >
+                    <option value="0">0%</option>
+                    <option value="2">2% (Sec 194C)</option>
+                    <option value="10">10% (Sec 194J)</option>
+                  </select>
+                </div>
+              </div>
+
               <div>
                 <label className="block text-sm font-bold text-slate-700 mb-1">Description of Service</label>
                 <input 
@@ -276,13 +310,27 @@ const InvoicesPage = () => {
                   <span className="text-sm font-medium text-slate-500">Base Amount</span>
                   <span className="text-sm font-bold text-slate-700">{formatCurrency(formBase)}</span>
                 </div>
-                <div className="flex justify-between items-center mb-3">
-                  <span className="text-sm font-medium text-slate-500">GST Amount ({formGstPct}%)</span>
-                  <span className="text-sm font-bold text-slate-700">+{formatCurrency(formGstAmt)}</span>
-                </div>
+                {formGstPct > 0 && (
+                  <>
+                    <div className="flex justify-between items-center mb-1">
+                      <span className="text-xs font-medium text-slate-400 pl-2">CGST ({formGstPct / 2}%)</span>
+                      <span className="text-xs font-bold text-slate-600">+{formatCurrency(formGstAmt / 2)}</span>
+                    </div>
+                    <div className="flex justify-between items-center mb-2">
+                      <span className="text-xs font-medium text-slate-400 pl-2">SGST ({formGstPct / 2}%)</span>
+                      <span className="text-xs font-bold text-slate-600">+{formatCurrency(formGstAmt / 2)}</span>
+                    </div>
+                  </>
+                )}
+                {formTdsAmt > 0 && (
+                  <div className="flex justify-between items-center mb-3">
+                    <span className="text-sm font-medium text-slate-500">TDS Deducted ({formData.tdsPercent}%)</span>
+                    <span className="text-sm font-bold text-rose-600">-{formatCurrency(formTdsAmt)}</span>
+                  </div>
+                )}
                 <div className="flex justify-between items-center pt-3 border-t border-slate-200">
-                  <span className="text-sm font-black text-slate-800 uppercase tracking-wider">Total Invoice Value</span>
-                  <span className="text-xl font-black text-emerald-600">{formatCurrency(formTotal)}</span>
+                  <span className="text-sm font-black text-slate-800 uppercase tracking-wider">Net Receivable</span>
+                  <span className="text-xl font-black text-emerald-600">{formatCurrency(netReceivable)}</span>
                 </div>
               </div>
 

@@ -6,7 +6,7 @@ generator client {
 }
 
 datasource db {
-  provider = "sqlite"
+  provider = "postgresql"
   url      = env("DATABASE_URL")
 }
 
@@ -49,6 +49,11 @@ model Transaction {
   user            User?    @relation(fields: [userId], references: [id])
   createdAt       DateTime @default(now())
   updatedAt       DateTime @updatedAt
+
+  @@index([transactionType])
+  @@index([source])
+  @@index([status])
+  @@index([createdAt])
 }
 
 // ─── REQUISITIONS ────────────────────────────────────────────
@@ -74,6 +79,10 @@ model Requisition {
   updatedAt     DateTime @updatedAt
 
   utilisations  Utilisation[]
+
+  @@index([status])
+  @@index([vertical])
+  @@index([raisedById])
 }
 
 // ─── BUDGET ──────────────────────────────────────────────────
@@ -106,12 +115,18 @@ model Salary {
   paymentDate   DateTime?
   reference     String?  // Payment reference number
   commission    Float?   // For agents — per enrolment commission
+  pfAmount      Float    @default(0) // Provident Fund deduction
+  tdsAmount     Float    @default(0) // Tax Deducted at Source
 
   userId        String?
   user          User?    @relation(fields: [userId], references: [id])
 
   createdAt     DateTime @default(now())
   updatedAt     DateTime @updatedAt
+
+  @@index([status])
+  @@index([month])
+  @@index([vertical])
 }
 
 // ─── DONOR FUNDS ─────────────────────────────────────────────
@@ -164,6 +179,9 @@ model StudentPayment {
   createdAt       DateTime @default(now())
   updatedAt       DateTime @updatedAt
   refundRequests  RefundRequest[]
+
+  @@index([status])
+  @@index([studentId])
 }
 
 // ─── AUDIT LOG ───────────────────────────────────────────────
@@ -177,6 +195,9 @@ model AuditLog {
   performedBy String
   user        User     @relation(fields: [performedBy], references: [id])
   createdAt   DateTime @default(now())
+
+  @@index([entity, entityId])
+  @@index([performedBy])
 }
 
 // ─── UTILISATIONS ──────────────────────────────────────────────
@@ -189,6 +210,7 @@ model Utilisation {
   amount        Float
   description   String
   billNo        String?
+  proofFileUrl  String?  // S3 URL for uploaded bills/receipts
   status        String   @default("PENDING") // PENDING, VERIFIED, REJECTED
   rejectionNote String?
   
@@ -210,9 +232,13 @@ model Invoice {
   direction     String   @default("OUTBOUND") // INBOUND, OUTBOUND
   vertical      String   // TRAINING, CSP, SDC, FUND_RAISING, TBB, SECRETARIAT, FINANCE
   clientName    String   // The client or entity name
+  panGstin      String?  // PAN or GSTIN for taxation tracking
   baseAmount    Float
   gstPercent    Int
+  cgstAmount    Float    @default(0)
+  sgstAmount    Float    @default(0)
   gstAmount     Float
+  tdsPercent    Float    @default(0)
   totalAmount   Float
   status        String   @default("DRAFT") // DRAFT, APPROVED, PAID
   description   String?

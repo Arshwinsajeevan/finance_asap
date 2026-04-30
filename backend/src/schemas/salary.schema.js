@@ -8,7 +8,7 @@ const createSalarySchema = z.object({
   employeeName: z.string().min(2, 'Employee name is required'),
   employeeId: z.string().optional(),
   vertical: z.enum(config.VERTICALS).optional(),
-  amount: z.number().positive('Amount must be positive'),
+  grossAmount: z.number().positive('Gross amount must be positive'),
   month: z.string().regex(/^\d{4}-\d{2}$/, 'Month format must be YYYY-MM'),
   status: z.enum(['PENDING', 'PAID', 'FAILED']).optional().default('PENDING'),
   reference: z.string().optional(),

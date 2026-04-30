@@ -52,18 +52,30 @@ const login = async (req, res) => {
 
 /**
  * POST /api/auth/register
+ * Only ADMINs can assign elevated roles (FINANCE_OFFICER, ADMIN).
+ * FINANCE_OFFICERs can only create VERTICAL_USER or STUDENT accounts.
  */
 const register = async (req, res) => {
   try {
     const { name, email, password, role, vertical, phone } = req.body;
 
-    if (!name || !email || !password) {
-      return error(res, 'Name, email, and password are required', 400);
-    }
-
     const existing = await prisma.user.findUnique({ where: { email } });
     if (existing) {
       return error(res, 'User with this email already exists', 409);
+    }
+
+    // ── Role enforcement: prevent privilege escalation ──
+    let assignedRole = 'VERTICAL_USER'; // Safe default
+
+    if (req.user && req.user.role === 'ADMIN') {
+      // ADMINs can assign any role
+      assignedRole = role || 'VERTICAL_USER';
+    } else if (req.user && req.user.role === 'FINANCE_OFFICER') {
+      // Finance officers can only create VERTICAL_USER or STUDENT
+      if (role === 'VERTICAL_USER' || role === 'STUDENT') {
+        assignedRole = role;
+      }
+      // Silently ignore attempts to create ADMIN or FINANCE_OFFICER
     }
 
     const hashedPassword = await bcrypt.hash(password, 12);
@@ -73,7 +85,7 @@ const register = async (req, res) => {
         name,
         email,
         password: hashedPassword,
-        role: role || 'VERTICAL_USER',
+        role: assignedRole,
         vertical: vertical || null,
         phone: phone || null,
       },

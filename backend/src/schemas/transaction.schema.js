@@ -1,18 +1,14 @@
 const { z } = require('zod');
 const config = require('../config');
 
-const createTransactionSchema = z.object({
-  transactionType: z.enum(config.TRANSACTION_TYPES, {
-    errorMap: () => ({ message: `Must be one of: ${config.TRANSACTION_TYPES.join(', ')}` }),
-  }),
-  source: z.enum(config.VERTICALS, {
-    errorMap: () => ({ message: `Must be one of: ${config.VERTICALS.join(', ')}` }),
-  }),
-  amount: z.number().positive('Amount must be positive'),
-  description: z.string().optional(),
-  reference: z.string().optional(),
-  status: z.enum(['SUCCESS', 'FAILED', 'PENDING']).optional().default('SUCCESS'),
-  userId: z.string().uuid().optional(),
+const transactionQuerySchema = z.object({
+  page: z.string().regex(/^\d+$/).optional().default('1'),
+  limit: z.string().regex(/^\d+$/).optional().default('20'),
+  type: z.enum([...config.TRANSACTION_TYPES, 'FEE_COLLECTION', 'INVOICE_PAYMENT']).optional(),
+  source: z.enum([...config.VERTICALS, 'FINANCE']).optional(),
+  status: z.enum(['SUCCESS', 'FAILED', 'PENDING']).optional(),
+  from: z.string().optional(),
+  to: z.string().optional(),
 });
 
-module.exports = { createTransactionSchema };
+module.exports = { transactionQuerySchema };

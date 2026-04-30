@@ -72,29 +72,38 @@ exports.submitUtilisation = async (req, res) => {
       return error(res, 'You can only submit utilisation for your own vertical', 403);
     }
 
-    if (requisition.status !== 'FUNDS_RELEASED') {
-      return error(res, 'Cannot submit utilisation for unreleased funds', 400);
+    if (!['UTILISATION_PENDING', 'FUNDS_RELEASED'].includes(requisition.status)) {
+      return error(res, 'Cannot submit utilisation — requisition funds have not been released yet', 400);
     }
 
-    const utilisation = await prisma.utilisation.create({
-      data: {
-        ...data,
-        vertical: requisition.vertical,
-        submittedById: req.user.userId
-      },
-      include: {
-        requisition: { select: { purpose: true } }
-      }
-    });
+    const utilisation = await prisma.$transaction(async (tx) => {
+      const record = await tx.utilisation.create({
+        data: {
+          ...data,
+          vertical: requisition.vertical,
+          submittedById: req.user.id || req.user.userId,
+        },
+        include: {
+          requisition: { select: { purpose: true } },
+        },
+      });
 
-    await prisma.auditLog.create({
-      data: {
-        action: 'CREATE',
-        entity: 'Utilisation',
-        entityId: utilisation.id,
-        performedBy: req.user.userId,
-        details: JSON.stringify({ amount: data.amount, requisitionId: data.requisitionId })
-      }
+      await tx.auditLog.create({
+        data: {
+          action: 'CREATE',
+          entity: 'Utilisation',
+          entityId: record.id,
+          performedBy: req.user.id || req.user.userId,
+          details: JSON.stringify({
+            amount: data.amount,
+            requisitionId: data.requisitionId,
+            vertical: requisition.vertical,
+            billNo: data.billNo || null,
+          }),
+        },
+      });
+
+      return record;
     });
 
     return success(res, utilisation, 'Utilisation submitted successfully', 201);

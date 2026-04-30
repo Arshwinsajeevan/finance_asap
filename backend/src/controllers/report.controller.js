@@ -3,28 +3,38 @@ const { success, error } = require('../utils/response');
 
 const getOverview = async (req, res) => {
   try {
+    const { startDate, endDate } = req.query;
+    const dateFilter = {};
+    if (startDate && endDate) {
+      dateFilter.createdAt = {
+        gte: new Date(startDate),
+        lte: new Date(endDate)
+      };
+    }
+
     const [transactions, requisitions, pendingUtilisation, budgets, recentTransactions, totalTransactions, topReceivables, topPayables] = await Promise.all([
       prisma.transaction.groupBy({
         by: ['transactionType'],
         _sum: { amount: true },
-        where: { status: 'SUCCESS' }
+        where: { status: 'SUCCESS', ...dateFilter }
       }),
       prisma.requisition.groupBy({
         by: ['status'],
-        _count: true
+        _count: true,
+        where: dateFilter
       }),
-      prisma.utilisation.count({ where: { status: 'PENDING' } }),
+      prisma.utilisation.count({ where: { status: 'PENDING', ...dateFilter } }),
       prisma.budget.findMany(),
-      prisma.transaction.findMany({ orderBy: { createdAt: 'desc' }, take: 5, include: { user: { select: { name: true } } } }),
-      prisma.transaction.count(),
+      prisma.transaction.findMany({ where: dateFilter, orderBy: { createdAt: 'desc' }, take: 5, include: { user: { select: { name: true } } } }),
+      prisma.transaction.count({ where: dateFilter }),
       prisma.studentPayment.findMany({ 
-        where: { status: { in: ['PENDING', 'PARTIAL'] } },
+        where: { status: { in: ['PENDING', 'PARTIAL'] }, ...dateFilter },
         orderBy: { createdAt: 'asc' },
         take: 5,
         include: { student: { select: { name: true } } }
       }),
       prisma.requisition.findMany({
-        where: { status: 'PENDING' },
+        where: { status: 'PENDING', ...dateFilter },
         orderBy: { createdAt: 'desc' },
         take: 5,
         include: { raisedBy: { select: { name: true } } }

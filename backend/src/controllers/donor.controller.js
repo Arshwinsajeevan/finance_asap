@@ -3,19 +3,36 @@ const { success, error, paginated } = require('../utils/response');
 
 const createDonorFund = async (req, res) => {
   try {
-    const fund = await prisma.donorFund.create({ data: req.body });
-    await prisma.auditLog.create({
-      data: { action: 'CREATE', entity: 'DonorFund', entityId: fund.id, details: JSON.stringify(req.body), performedBy: req.user.id },
+    const fund = await prisma.$transaction(async (tx) => {
+      const donor = await tx.donorFund.create({ data: req.body });
+
+      await tx.transaction.create({
+        data: {
+          transactionType: 'DONOR_FUND',
+          source: req.body.vertical || 'FUND_RAISING',
+          amount: req.body.amount,
+          description: `Donor: ${req.body.donorName} - ${req.body.purpose || 'General'}`,
+          status: 'SUCCESS',
+          userId: req.user.id,
+        },
+      });
+
+      await tx.auditLog.create({
+        data: {
+          action: 'CREATE',
+          entity: 'DonorFund',
+          entityId: donor.id,
+          details: JSON.stringify(req.body),
+          performedBy: req.user.id,
+        },
+      });
+
+      return donor;
     });
-    // Also create a transaction record
-    await prisma.transaction.create({
-      data: {
-        transactionType: 'DONOR_FUND', source: req.body.vertical || 'FUND_RAISING', amount: req.body.amount,
-        description: `Donor: ${req.body.donorName} - ${req.body.purpose || 'General'}`, status: 'SUCCESS',
-      },
-    });
+
     return success(res, fund, 'Donor fund recorded', 201);
   } catch (err) {
+    console.error('Create donor fund error:', err);
     return error(res, 'Failed to record donor fund');
   }
 };

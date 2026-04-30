@@ -10,6 +10,7 @@ const RefundsPage = () => {
 
   // Modals
   const [showReviewModal, setShowReviewModal] = useState(false);
+  const [showRejectModal, setShowRejectModal] = useState(false);
   const [selectedRefund, setSelectedRefund] = useState(null);
   const [rejectionNote, setRejectionNote] = useState('');
 
@@ -40,6 +41,7 @@ const RefundsPage = () => {
         rejectionNote: status === 'REJECTED' ? rejectionNote : undefined
       });
       setShowReviewModal(false);
+      setShowRejectModal(false);
       setRejectionNote('');
       fetchData();
     } catch (err) {
@@ -49,8 +51,13 @@ const RefundsPage = () => {
 
   const openReviewModal = (refund) => {
     setSelectedRefund(refund);
-    setRejectionNote('');
     setShowReviewModal(true);
+  };
+
+  const openRejectModal = (refund) => {
+    setSelectedRefund(refund);
+    setRejectionNote('');
+    setShowRejectModal(true);
   };
 
   const formatCurrency = (amount) => {
@@ -137,7 +144,7 @@ const RefundsPage = () => {
                             Approve
                           </button>
                           <button 
-                            onClick={() => openReviewModal(refund)}
+                            onClick={() => openRejectModal(refund)}
                             className="px-3 py-1.5 bg-red-50 text-red-700 font-bold text-xs rounded-lg hover:bg-red-100 transition-colors"
                           >
                             Reject
@@ -227,27 +234,62 @@ const RefundsPage = () => {
               )}
 
               {selectedRefund.status === 'PENDING' && user.role === 'FINANCE_OFFICER' && (
-                <div className="pt-4 border-t border-slate-100">
-                  <h4 className="text-sm font-bold text-slate-800 mb-3 text-red-600 flex items-center">
-                    <ShieldAlert className="w-4 h-4 mr-1" /> Reject Request
-                  </h4>
-                  <textarea 
-                    value={rejectionNote} 
-                    onChange={e => setRejectionNote(e.target.value)} 
-                    className="input-field min-h-[80px] mb-3" 
-                    placeholder="Provide a reason for rejection..." 
-                  />
-                  <div className="flex justify-end">
-                    <button 
-                      onClick={() => handleAction('REJECTED')}
-                      disabled={!rejectionNote}
-                      className="px-6 py-2.5 rounded-xl text-white font-bold bg-red-600 hover:bg-red-700 disabled:opacity-50 transition-colors"
-                    >
-                      Confirm Rejection
-                    </button>
-                  </div>
+                <div className="pt-4 border-t border-slate-100 flex justify-end gap-3">
+                  <button 
+                    onClick={() => openRejectModal(selectedRefund)}
+                    className="px-6 py-2.5 rounded-xl text-red-600 font-bold border border-red-200 hover:bg-red-50 transition-colors"
+                  >
+                    Reject
+                  </button>
+                  <button 
+                    onClick={() => handleAction('APPROVED')}
+                    className="px-6 py-2.5 rounded-xl text-white font-bold bg-emerald-600 hover:bg-emerald-700 transition-colors"
+                  >
+                    Approve Request
+                  </button>
                 </div>
               )}
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Reject Modal */}
+      {showRejectModal && selectedRefund && (
+        <div className="fixed inset-0 bg-slate-900/60 flex items-center justify-center z-[60] backdrop-blur-sm animate-in fade-in duration-200 p-4">
+          <div className="bg-white rounded-2xl shadow-2xl w-full max-w-md overflow-hidden animate-in zoom-in-95 duration-200">
+            <div className="px-6 py-4 border-b border-red-100 bg-red-50 flex justify-between items-center">
+              <h3 className="font-bold text-red-800 text-lg flex items-center">
+                <ShieldAlert className="w-5 h-5 mr-2" /> Reject Refund
+              </h3>
+              <button onClick={() => setShowRejectModal(false)} className="text-red-400 hover:text-red-600"><X className="w-5 h-5" /></button>
+            </div>
+            <div className="p-6">
+              <p className="text-sm text-slate-600 mb-4">
+                You are about to reject the refund request for <strong>{selectedRefund.studentPayment.student.name}</strong>. This action requires a mandatory rejection reason.
+              </p>
+              <textarea 
+                required
+                value={rejectionNote} 
+                onChange={e => setRejectionNote(e.target.value)} 
+                className="input-field min-h-[100px] mb-4 border-red-200 focus:border-red-500 focus:ring-red-500" 
+                placeholder="Type the exact reason for rejection here..." 
+              />
+              <div className="flex space-x-3">
+                <button 
+                  onClick={() => setShowRejectModal(false)}
+                  className="flex-1 py-2.5 px-4 border border-slate-200 rounded-xl text-slate-600 font-bold hover:bg-slate-50 transition-colors"
+                >
+                  Cancel
+                </button>
+                <button 
+                  onClick={() => handleAction('REJECTED')}
+                  disabled={!rejectionNote.trim()}
+                  className="flex-1 py-2.5 px-4 rounded-xl text-white font-bold bg-red-600 hover:bg-red-700 disabled:opacity-50 transition-colors"
+                >
+                  Confirm Rejection
+                </button>
+              </div>
             </div>
           </div>
         </div>

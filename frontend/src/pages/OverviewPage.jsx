@@ -2,6 +2,8 @@ import React, { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import api from '../api/axios';
+import DatePicker from 'react-datepicker';
+import 'react-datepicker/dist/react-datepicker.css';
 import { 
   IndianRupee, TrendingUp, TrendingDown, Clock, ArrowRightLeft, 
   Landmark, FileText, FileCheck, AlertCircle, Activity, Download, 
@@ -28,7 +30,7 @@ const TopCard = ({ title, amount, subtitle, icon: Icon, color, trend }) => (
   </div>
 );
 
-const DonutChart = ({ data, total, title, colors }) => {
+const DonutChart = ({ data, total, title, colors, onNavigate }) => {
   let currentPct = 0;
   const gradients = data.map((item, i) => {
     const pct = total > 0 ? (item.val / total) * 100 : 0;
@@ -50,12 +52,17 @@ const DonutChart = ({ data, total, title, colors }) => {
         {data.map((item, i) => {
           const pct = total > 0 ? (item.val / total) * 100 : 0;
           return (
-            <div key={item.label} className="flex justify-between items-center text-xs">
-              <div className="flex items-center text-slate-600 font-semibold">
-                <div className="w-2.5 h-2.5 rounded-full mr-2" style={{ backgroundColor: colors[i] }}></div>
+            <div 
+              key={item.label} 
+              onClick={() => onNavigate && item.route && onNavigate(item.route)}
+              className={`flex justify-between items-center text-xs p-1.5 -mx-1.5 rounded-lg transition-all ${item.route ? 'cursor-pointer hover:bg-slate-50 hover:shadow-sm border border-transparent hover:border-slate-100 group' : ''}`}
+              title={item.route ? `View ${item.label} transactions` : ''}
+            >
+              <div className="flex items-center text-slate-600 font-semibold group-hover:text-primary-600 transition-colors">
+                <div className="w-2.5 h-2.5 rounded-full mr-2 shadow-sm" style={{ backgroundColor: colors[i] }}></div>
                 {item.label}
               </div>
-              <div className="font-bold text-slate-800">{pct.toFixed(1)}%</div>
+              <div className="font-bold text-slate-800 group-hover:text-primary-700">{pct.toFixed(1)}%</div>
             </div>
           );
         })}
@@ -69,11 +76,19 @@ const OverviewPage = () => {
   const navigate = useNavigate();
   const [data, setData] = useState(null);
   const [loading, setLoading] = useState(true);
+  const [dateRange, setDateRange] = useState([null, null]);
+  const [startDate, endDate] = dateRange;
 
   useEffect(() => {
     const fetchOverview = async () => {
       try {
-        const response = await api.get('/finance/reports/overview');
+        setLoading(true);
+        const params = {};
+        if (startDate && endDate) {
+          params.startDate = startDate.toISOString();
+          params.endDate = endDate.toISOString();
+        }
+        const response = await api.get('/finance/reports/overview', { params });
         setData(response.data.data);
       } catch (error) {
         console.error('Failed to fetch overview data', error);
@@ -82,7 +97,7 @@ const OverviewPage = () => {
       }
     };
     fetchOverview();
-  }, []);
+  }, [startDate, endDate]);
 
   const formatCurrency = (amount) => {
     return new Intl.NumberFormat('en-IN', {
@@ -101,30 +116,39 @@ const OverviewPage = () => {
   const { stats, revenueSplit, expenseSplit, topReceivables, topPayables, budgets } = data;
   
   const revData = [
-    { label: 'Student Fees', val: revenueSplit.fees },
-    { label: 'Donor Funds', val: revenueSplit.donors },
-    { label: 'Other', val: revenueSplit.other }
+    { label: 'Student Fees', val: revenueSplit.fees, route: '/fee-collections' },
+    { label: 'Donor Funds', val: revenueSplit.donors, route: '/donors' },
+    { label: 'Other', val: revenueSplit.other, route: '/reports' }
   ];
   
   const expData = [
-    { label: 'Salaries', val: expenseSplit.salaries },
-    { label: 'Requisitions', val: expenseSplit.requisitions },
-    { label: 'Refunds', val: expenseSplit.refunds },
-    { label: 'Other', val: expenseSplit.other }
+    { label: 'Salaries', val: expenseSplit.salaries, route: '/salaries' },
+    { label: 'Requisitions', val: expenseSplit.requisitions, route: '/requisitions' },
+    { label: 'Refunds', val: expenseSplit.refunds, route: '/refunds' },
+    { label: 'Other', val: expenseSplit.other, route: '/reports' }
   ];
 
   return (
     <div className="space-y-4 animate-in fade-in slide-in-from-bottom-4 duration-500 max-w-[1600px] mx-auto bg-[#f8fafb] min-h-screen pb-10">
       
-      <div className="flex justify-between items-end mb-4">
+      <div className="flex flex-col md:flex-row justify-between items-start md:items-end mb-4 gap-4">
         <div>
           <h2 className="text-2xl font-bold text-[#1e293b]">Finance / Accounts Dashboard</h2>
           <p className="text-sm text-slate-500">Welcome back, {user?.role === 'ADMIN' ? 'Admin Team' : 'Finance Team'}!</p>
         </div>
-        <div className="flex gap-3">
-          <div className="bg-white border border-slate-200 px-4 py-2 rounded-lg text-sm font-semibold text-slate-600 shadow-sm flex items-center cursor-pointer hover:bg-slate-50">
-            <Clock className="w-4 h-4 mr-2 text-slate-400" />
-            FY 2025-2026
+        <div className="flex gap-3 z-10">
+          <div className="bg-white border border-slate-200 px-3 py-1.5 rounded-lg text-sm font-semibold text-slate-600 shadow-sm flex items-center hover:bg-slate-50 transition-colors">
+            <Clock className="w-4 h-4 mr-2 text-slate-400 shrink-0" />
+            <DatePicker
+              selectsRange={true}
+              startDate={startDate}
+              endDate={endDate}
+              onChange={(update) => setDateRange(update)}
+              isClearable={true}
+              placeholderText="Filter by Date Range"
+              className="bg-transparent border-none focus:outline-none w-48 text-sm font-semibold cursor-pointer text-slate-700 placeholder:text-slate-400"
+              dateFormat="MMM d, yyyy"
+            />
           </div>
         </div>
       </div>
@@ -145,13 +169,13 @@ const OverviewPage = () => {
         {/* Revenue Split Donut */}
         <div className="bg-white rounded-xl shadow-sm border border-slate-100 p-5">
           <h4 className="text-sm font-bold text-slate-800 mb-6">Revenue Split</h4>
-          <DonutChart data={revData} total={stats.totalIncome} colors={['#3b82f6', '#10b981', '#f59e0b']} />
+          <DonutChart data={revData} total={stats.totalIncome} colors={['#3b82f6', '#10b981', '#f59e0b']} onNavigate={navigate} />
         </div>
 
         {/* Expense Split Donut */}
         <div className="bg-white rounded-xl shadow-sm border border-slate-100 p-5">
           <h4 className="text-sm font-bold text-slate-800 mb-6">Expense Breakdown</h4>
-          <DonutChart data={expData} total={stats.totalExpenses} colors={['#8b5cf6', '#ef4444', '#f97316', '#64748b']} />
+          <DonutChart data={expData} total={stats.totalExpenses} colors={['#8b5cf6', '#ef4444', '#f97316', '#64748b']} onNavigate={navigate} />
         </div>
 
         {/* Scheme / Vertical Wise Revenue/Budget */}

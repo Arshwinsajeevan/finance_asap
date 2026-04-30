@@ -2,6 +2,7 @@ const express = require('express');
 const cors = require('cors');
 const helmet = require('helmet');
 const morgan = require('morgan');
+const rateLimit = require('express-rate-limit');
 const config = require('./config');
 const { passport } = require('./middleware/auth');
 
@@ -29,7 +30,20 @@ app.use(express.json({ limit: '10mb' }));
 app.use(express.urlencoded({ extended: true }));
 app.use(passport.initialize());
 
+// ─── Rate Limiting ───────────────────────────────────────────
+const loginLimiter = rateLimit({
+  windowMs: 60 * 1000,     // 1 minute window
+  max: 5,                  // 5 attempts per IP per window
+  standardHeaders: true,
+  legacyHeaders: false,
+  message: {
+    success: false,
+    message: 'Too many login attempts. Please try again after 1 minute.',
+  },
+});
+
 // ─── API Routes ──────────────────────────────────────────────
+app.use('/api/auth/login', loginLimiter);  // Apply BEFORE the route
 app.use('/api/auth', authRoutes);
 app.use('/api/finance/transactions', transactionRoutes);
 app.use('/api/finance/requisitions', requisitionRoutes);

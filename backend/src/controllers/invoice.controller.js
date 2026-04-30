@@ -23,37 +23,78 @@ exports.getInvoices = async (req, res) => {
   }
 };
 
+/**
+ * POST /api/finance/invoices
+ * Accepts taxation fields (panGstin, tdsPercent) and auto-computes
+ * CGST/SGST splits and net receivable server-side.
+ */
 exports.createInvoice = async (req, res) => {
   try {
-    const { vertical, clientName, baseAmount, gstPercent, description } = req.body;
-    
-    if (baseAmount <= 0) return error(res, 'Base amount must be greater than 0', 400);
+    const { vertical, clientName, baseAmount, gstPercent, tdsPercent, panGstin, description } = req.body;
 
+    // ── Server-side tax computations (never trust frontend math) ──
     const bAmt = Number(baseAmount);
     const gPct = Number(gstPercent);
-    const gstAmount = (bAmt * gPct) / 100;
-    const totalAmount = bAmt + gstAmount;
+    const tPct = Number(tdsPercent) || 0;
 
-    // Generate invoice number
-    const dateStr = new Date().toISOString().slice(0,10).replace(/-/g, '');
+    const gstAmount  = (bAmt * gPct) / 100;
+    const cgstAmount = gstAmount / 2;            // Equal CGST/SGST split
+    const sgstAmount = gstAmount / 2;
+    const totalAmount = bAmt + gstAmount;         // Gross invoice value
+    const tdsAmount   = (bAmt * tPct) / 100;      // TDS on base amount
+    const netReceivable = totalAmount - tdsAmount; // What actually gets collected
+
+    // ── Generate sequential invoice number ──
+    const dateStr = new Date().toISOString().slice(0, 10).replace(/-/g, '');
     const rand = Math.floor(Math.random() * 10000).toString().padStart(4, '0');
     const invoiceNumber = `INV-${dateStr}-${rand}`;
 
-    const invoice = await prisma.invoice.create({
-      data: {
-        invoiceNumber,
-        vertical,
-        clientName,
-        baseAmount: bAmt,
-        gstPercent: gPct,
-        gstAmount,
-        totalAmount,
-        status: 'DRAFT',
-        description
-      }
+    // ── Atomic: Create Invoice + Audit Log ──
+    const invoice = await prisma.$transaction(async (tx) => {
+      const inv = await tx.invoice.create({
+        data: {
+          invoiceNumber,
+          vertical,
+          clientName,
+          panGstin: panGstin || null,
+          baseAmount: bAmt,
+          gstPercent: gPct,
+          cgstAmount,
+          sgstAmount,
+          gstAmount,
+          tdsPercent: tPct,
+          totalAmount,
+          status: 'DRAFT',
+          description,
+        },
+      });
+
+      await tx.auditLog.create({
+        data: {
+          action: 'CREATE',
+          entity: 'Invoice',
+          entityId: inv.id,
+          details: JSON.stringify({
+            invoiceNumber,
+            clientName,
+            baseAmount: bAmt,
+            gstPercent: gPct,
+            cgstAmount,
+            sgstAmount,
+            tdsPercent: tPct,
+            tdsAmount,
+            totalAmount,
+            netReceivable,
+            panGstin: panGstin || null,
+          }),
+          performedBy: req.user.id,
+        },
+      });
+
+      return inv;
     });
 
-    return success(res, invoice, 'Invoice created successfully', 201);
+    return success(res, { ...invoice, netReceivable }, 'Invoice created successfully', 201);
   } catch (err) {
     console.error('Create Invoice Error:', err);
     return error(res, 'Failed to create invoice');
