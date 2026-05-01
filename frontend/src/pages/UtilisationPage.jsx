@@ -37,8 +37,8 @@ const UtilisationPage = () => {
     e.preventDefault();
     try {
       await api.patch(`/finance/utilisations/${selectedUtil.id}/verify`, {
-        status: actionType === 'APPROVE' ? 'APPROVED' : 'REJECTED',
-        rejectionNote: actionType === 'REJECTED' ? rejectionNote : undefined
+        status: actionType === 'APPROVE' ? 'VERIFIED' : 'REJECTED',
+        rejectionNote: actionType === 'REJECT' ? rejectionNote : undefined
       });
       setShowReviewModal(false);
       fetchData();

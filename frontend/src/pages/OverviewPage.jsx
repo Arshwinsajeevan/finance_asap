@@ -17,7 +17,7 @@ const TopCard = ({ title, amount, subtitle, icon: Icon, color, trend }) => (
         <Icon className="w-5 h-5" />
       </div>
       {trend && (
-        <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full ${trend.isUp ? 'bg-emerald-50 text-emerald-600' : 'bg-red-50 text-red-600'}`}>
+        <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full ${trend.isPositive ? 'bg-emerald-50 text-emerald-600' : 'bg-red-50 text-red-600'}`}>
           {trend.isUp ? '↑' : '↓'} {trend.val}%
         </span>
       )}
@@ -153,12 +153,53 @@ const OverviewPage = () => {
         </div>
       </div>
 
+      {/* Budget Overspend Warning Banner */}
+      {budgets && (() => {
+        const criticalBudgets = budgets.filter(b => {
+          const pct = b.allocated > 0 ? (b.used / b.allocated) * 100 : 0;
+          return pct >= 90;
+        });
+        if (criticalBudgets.length === 0) return null;
+        return (
+          <div className="bg-gradient-to-r from-amber-50 via-red-50 to-amber-50 border border-red-200 rounded-xl p-4 shadow-sm animate-in fade-in slide-in-from-top-2 duration-300">
+            <div className="flex items-start gap-3">
+              <div className="p-2 bg-red-100 rounded-lg shrink-0 mt-0.5">
+                <AlertCircle className="w-5 h-5 text-red-600" />
+              </div>
+              <div className="flex-1 min-w-0">
+                <h4 className="text-sm font-bold text-red-800">⚠️ Budget Alert — {criticalBudgets.length} vertical{criticalBudgets.length > 1 ? 's' : ''} near or over limit</h4>
+                <div className="mt-2 flex flex-wrap gap-2">
+                  {criticalBudgets.map(b => {
+                    const pct = Math.round((b.used / b.allocated) * 100);
+                    const remaining = b.allocated - b.used;
+                    const isOver = pct >= 100;
+                    return (
+                      <div key={b.id} className={`flex items-center gap-2 px-3 py-1.5 rounded-lg text-xs font-semibold border ${isOver ? 'bg-red-100 text-red-800 border-red-300' : 'bg-amber-100 text-amber-800 border-amber-300'}`}>
+                        <span>{b.vertical}</span>
+                        <span className="font-black">{pct}%</span>
+                        <span className="text-[10px] font-medium opacity-75">
+                          ({remaining <= 0 ? 'Exhausted' : `${formatCurrency(remaining)} left`})
+                        </span>
+                      </div>
+                    );
+                  })}
+                </div>
+                <p className="text-[11px] text-red-600/70 mt-2 font-medium">
+                  Verticals at or above 90% utilisation are flagged. New requisitions exceeding the remaining balance will be rejected.
+                  <span onClick={() => navigate('/budget')} className="ml-1 text-red-700 underline cursor-pointer hover:text-red-900 font-bold">View Budget Details →</span>
+                </p>
+              </div>
+            </div>
+          </div>
+        );
+      })()}
+
       {/* Row 1: 6 Top Metric Cards */}
       <div className="grid grid-cols-2 md:grid-cols-3 xl:grid-cols-6 gap-4">
-        <TopCard title="Total Revenue" amount={formatCurrency(stats.totalIncome)} subtitle="Total Inflow" icon={IndianRupee} color="bg-emerald-500" trend={{isUp: true, val: 12.6}} />
-        <TopCard title="Funds Released" amount={formatCurrency(expenseSplit.requisitions)} subtitle="Total Outflow" icon={Download} color="bg-blue-500" trend={{isUp: true, val: 8.4}} />
-        <TopCard title="Total Expenses" amount={formatCurrency(stats.totalExpenses)} subtitle="Operating Costs" icon={TrendingDown} color="bg-amber-500" trend={{isUp: false, val: 2.1}} />
-        <TopCard title="Net Surplus" amount={formatCurrency(stats.netBalance)} subtitle="Income - Expense" icon={TrendingUp} color="bg-teal-500" trend={{isUp: true, val: 5.3}} />
+        <TopCard title="Total Revenue" amount={formatCurrency(stats.totalIncome)} subtitle="Total Inflow" icon={IndianRupee} color="bg-emerald-500" trend={{isUp: stats.trends?.income >= 0, isPositive: stats.trends?.income >= 0, val: Math.abs(stats.trends?.income || 0)}} />
+        <TopCard title="Funds Released" amount={formatCurrency(expenseSplit.requisitions)} subtitle="Total Outflow" icon={Download} color="bg-blue-500" trend={{isUp: stats.trends?.fundsReleased >= 0, isPositive: stats.trends?.fundsReleased >= 0, val: Math.abs(stats.trends?.fundsReleased || 0)}} />
+        <TopCard title="Total Expenses" amount={formatCurrency(stats.totalExpenses)} subtitle="Operating Costs" icon={TrendingDown} color="bg-amber-500" trend={{isUp: stats.trends?.expenses >= 0, isPositive: stats.trends?.expenses <= 0, val: Math.abs(stats.trends?.expenses || 0)}} />
+        <TopCard title="Net Surplus" amount={formatCurrency(stats.netBalance)} subtitle="Income - Expense" icon={TrendingUp} color="bg-teal-500" trend={{isUp: stats.trends?.netBalance >= 0, isPositive: stats.trends?.netBalance >= 0, val: Math.abs(stats.trends?.netBalance || 0)}} />
         <TopCard title="Pending Receivables" amount={stats.pendingRequisitions.toString()} subtitle="Pending Approvals" icon={Clock} color="bg-purple-500" />
         <TopCard title="Pending Utilisations" amount={stats.pendingUtilisation.toString()} subtitle="Awaiting Verification" icon={FileCheck} color="bg-rose-500" />
       </div>

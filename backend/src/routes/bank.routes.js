@@ -3,11 +3,12 @@ const { authenticate } = require('../middleware/auth');
 const authorize = require('../middleware/authorize');
 const { validate } = require('../middleware/validate');
 const { createBankRecordSchema } = require('../schemas/bank.schema');
+const { withCacheBust } = require('../middleware/cacheBust');
 const ctrl = require('../controllers/bank.controller');
 
 router.use(authenticate);
 
-router.post('/', authorize('FINANCE_OFFICER'), validate(createBankRecordSchema), ctrl.createBankRecord);
+router.post('/', authorize('FINANCE_OFFICER'), validate(createBankRecordSchema), withCacheBust(ctrl.createBankRecord));
 router.get('/guarantees', authorize('FINANCE_OFFICER', 'ADMIN'), ctrl.getGuarantees);
 router.get('/', authorize('FINANCE_OFFICER', 'ADMIN'), ctrl.getBankRecords);
 

@@ -3,11 +3,12 @@ const { authenticate } = require('../middleware/auth');
 const authorize = require('../middleware/authorize');
 const { validate } = require('../middleware/validate');
 const { createDonorFundSchema } = require('../schemas/donor.schema');
+const { withCacheBust } = require('../middleware/cacheBust');
 const ctrl = require('../controllers/donor.controller');
 
 router.use(authenticate);
 
-router.post('/', authorize('FINANCE_OFFICER', 'VERTICAL_USER'), validate(createDonorFundSchema), ctrl.createDonorFund);
+router.post('/', authorize('FINANCE_OFFICER', 'VERTICAL_USER'), validate(createDonorFundSchema), withCacheBust(ctrl.createDonorFund));
 router.get('/summary', authorize('FINANCE_OFFICER', 'ADMIN'), ctrl.getDonorSummary);
 router.get('/', authorize('FINANCE_OFFICER', 'ADMIN'), ctrl.getDonorFunds);
 

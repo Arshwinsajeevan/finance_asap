@@ -1,18 +1,51 @@
 const prisma = require('../utils/prisma');
 const { success, error } = require('../utils/response');
+const cache = require('../utils/cache');
 
 const getOverview = async (req, res) => {
   try {
     const { startDate, endDate } = req.query;
+
+    // ── Build cache key based on date range ──
+    const cacheKey = startDate && endDate
+      ? `overview:${startDate}:${endDate}`
+      : 'overview:all';
+
+    // ── Check cache first ──
+    const cached = cache.get(cacheKey);
+    if (cached) {
+      return success(res, cached, 'Dashboard overview (cached)');
+    }
+
+    // ── Cache MISS: Run all queries ──
     const dateFilter = {};
+    let prevDateFilter = {}; // For calculating trends
+
     if (startDate && endDate) {
+      const start = new Date(startDate);
+      const end = new Date(endDate);
       dateFilter.createdAt = {
-        gte: new Date(startDate),
-        lte: new Date(endDate)
+        gte: start,
+        lte: end
+      };
+      
+      const duration = end.getTime() - start.getTime();
+      prevDateFilter.createdAt = {
+        gte: new Date(start.getTime() - duration),
+        lt: start
+      };
+    } else {
+      // If no dates provided (All time), compare the last 30 days to the previous 30 days for trend indicators
+      const now = new Date();
+      const thirtyDaysAgo = new Date(now.getTime() - 30 * 24 * 60 * 60 * 1000);
+      const sixtyDaysAgo = new Date(now.getTime() - 60 * 24 * 60 * 60 * 1000);
+      prevDateFilter.createdAt = {
+        gte: sixtyDaysAgo,
+        lt: thirtyDaysAgo
       };
     }
 
-    const [transactions, requisitions, pendingUtilisation, budgets, recentTransactions, totalTransactions, topReceivables, topPayables] = await Promise.all([
+    const [transactions, requisitions, pendingUtilisation, budgets, recentTransactions, totalTransactions, topReceivables, topPayables, prevTransactions] = await Promise.all([
       prisma.transaction.groupBy({
         by: ['transactionType'],
         _sum: { amount: true },
@@ -38,6 +71,12 @@ const getOverview = async (req, res) => {
         orderBy: { createdAt: 'desc' },
         take: 5,
         include: { raisedBy: { select: { name: true } } }
+      }),
+      // Query previous period transactions for trend calculations
+      prisma.transaction.groupBy({
+        by: ['transactionType'],
+        _sum: { amount: true },
+        where: { status: 'SUCCESS', ...prevDateFilter }
       })
     ]);
 
@@ -64,6 +103,34 @@ const getOverview = async (req, res) => {
       }
     });
 
+    let prevIncome = 0;
+    let prevExpenses = 0;
+    let prevFundsReleased = 0;
+
+    prevTransactions.forEach(t => {
+      const amt = t._sum.amount || 0;
+      if (t.transactionType === 'FEE_COLLECTION' || t.transactionType === 'DONOR_FUND') {
+        prevIncome += amt;
+      } else if (t.transactionType === 'SALARY' || t.transactionType === 'FUND_RELEASE' || t.transactionType === 'REFUND' || t.transactionType === 'INVOICE_PAYMENT') {
+        prevExpenses += amt;
+      }
+      if (t.transactionType === 'FUND_RELEASE') {
+        prevFundsReleased += amt;
+      }
+    });
+
+    const calculateTrend = (current, previous) => {
+      if (previous === 0) return current > 0 ? 100 : 0;
+      return Math.round(((current - previous) / previous) * 1000) / 10;
+    };
+
+    const trends = {
+      income: calculateTrend(income, prevIncome),
+      expenses: calculateTrend(expenses, prevExpenses),
+      fundsReleased: calculateTrend(expenseSplit.requisitions, prevFundsReleased),
+      netBalance: calculateTrend(income - expenses, prevIncome - prevExpenses)
+    };
+
     const totalAllocated = budgets.reduce((s, b) => s + b.allocated, 0);
     const totalUsed = budgets.reduce((s, b) => s + b.used, 0);
     const pendingReqCount = requisitions.find(r => r.status === 'PENDING')?._count || 0;
@@ -86,9 +153,12 @@ const getOverview = async (req, res) => {
     }));
 
     const overBudgetVerticals = budgets.filter(b => b.used > b.allocated).map(b => b.vertical);
-    const openingBalance = 15000000; // Mock opening balance
+    
+    // Removing the 15Cr hardcoded opening balance. 
+    // In the future, this should be fetched from a SystemConfig table.
+    const openingBalance = 0; 
 
-    return success(res, {
+    const responseData = {
       stats: {
         totalBudget: totalAllocated,
         budgetUsed: totalUsed,
@@ -103,7 +173,8 @@ const getOverview = async (req, res) => {
         totalInflow: income,
         totalOutflow: expenses,
         closingBalance: openingBalance + income - expenses,
-        overBudgetAlerts: overBudgetVerticals
+        overBudgetAlerts: overBudgetVerticals,
+        trends
       },
       revenueSplit,
       expenseSplit,
@@ -111,7 +182,12 @@ const getOverview = async (req, res) => {
       topPayables: formattedPayables,
       budgets,
       recentTransactions,
-    });
+    };
+
+    // ── Store in cache for 5 minutes ──
+    cache.set(cacheKey, responseData, 300);
+
+    return success(res, responseData, 'Dashboard overview');
   } catch (err) {
     console.error('Overview Error:', err);
     return error(res, 'Failed to get overview');

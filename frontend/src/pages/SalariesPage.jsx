@@ -13,15 +13,16 @@ const SalariesPage = () => {
 
   // Create form state
   const [formData, setFormData] = useState({
-    employeeName: '', employeeType: 'EMPLOYEE', amount: '', commission: '0',
+    employeeName: '', employeeType: 'EMPLOYEE', grossAmount: '', commission: '0',
     month: '', vertical: 'SECRETARIAT'
   });
 
-  // Taxation Engine Calculations
-  const grossAmount = Number(formData.amount) || 0;
+  // Taxation Engine Calculations (preview only — backend computes the real values)
+  const grossAmount = Number(formData.grossAmount) || 0;
   const isEmployee = formData.employeeType === 'EMPLOYEE';
-  const pfDeduction = isEmployee ? grossAmount * 0.12 : 0; // 12% PF for regular employees
-  const tdsDeduction = !isEmployee ? grossAmount * 0.10 : 0; // 10% TDS for contractors/trainers
+  const isAgent = formData.employeeType === 'AGENT';
+  const pfDeduction = isEmployee ? Math.round(grossAmount * 0.12 * 100) / 100 : 0;
+  const tdsDeduction = (!isEmployee && !isAgent) ? Math.round(grossAmount * 0.10 * 100) / 100 : 0;
   const netPayable = grossAmount - pfDeduction - tdsDeduction + (Number(formData.commission) || 0);
 
   const fetchSalaries = async () => {
@@ -59,12 +60,15 @@ const SalariesPage = () => {
     e.preventDefault();
     try {
       await api.post('/finance/salaries', {
-        ...formData,
-        amount: netPayable, // Store Net Payable after deductions
+        employeeName: formData.employeeName,
+        employeeType: formData.employeeType,
+        grossAmount: Number(formData.grossAmount),
         commission: Number(formData.commission) || 0,
+        month: formData.month,
+        vertical: formData.vertical,
       });
       setShowModal(false);
-      setFormData({ employeeName: '', employeeType: 'EMPLOYEE', amount: '', commission: '0', month: '', vertical: 'SECRETARIAT' });
+      setFormData({ employeeName: '', employeeType: 'EMPLOYEE', grossAmount: '', commission: '0', month: '', vertical: 'SECRETARIAT' });
       fetchSalaries();
     } catch (err) {
       alert('Failed: ' + (err.response?.data?.message || err.message));
@@ -159,16 +163,18 @@ const SalariesPage = () => {
               <tr>
                 <th className="px-6 py-4 font-semibold">Recipient</th>
                 <th className="px-6 py-4 font-semibold">Period & Vertical</th>
-                <th className="px-6 py-4 font-semibold text-right">Amount</th>
+                <th className="px-6 py-4 font-semibold text-right">Gross</th>
+                <th className="px-6 py-4 font-semibold text-right">Deductions</th>
+                <th className="px-6 py-4 font-semibold text-right">Net Payable</th>
                 <th className="px-6 py-4 font-semibold text-center">Status</th>
                 <th className="px-6 py-4 font-semibold text-center">Actions</th>
               </tr>
             </thead>
             <tbody>
               {loading ? (
-                <tr><td colSpan="5" className="text-center py-8 text-slate-500">Loading...</td></tr>
+                <tr><td colSpan="7" className="text-center py-8 text-slate-500">Loading...</td></tr>
               ) : salaries.length === 0 ? (
-                <tr><td colSpan="5" className="text-center py-8 text-slate-500">No records found</td></tr>
+                <tr><td colSpan="7" className="text-center py-8 text-slate-500">No records found</td></tr>
               ) : (
                 salaries.map((salary) => (
                   <tr key={salary.id} className="bg-white border-b border-slate-50 hover:bg-slate-50/50 transition-colors">
@@ -188,7 +194,26 @@ const SalariesPage = () => {
                       <div className="text-xs text-slate-500 mt-0.5">{salary.vertical || 'Secretariat'}</div>
                     </td>
                     <td className="px-6 py-4 text-right">
-                      <div className="font-semibold text-slate-900">{formatCurrency(salary.amount)}</div>
+                      <div className="font-medium text-slate-600">
+                        {formatCurrency(salary.amount + (salary.pfAmount || 0) + (salary.tdsAmount || 0))}
+                      </div>
+                    </td>
+                    <td className="px-6 py-4 text-right">
+                      {(salary.pfAmount > 0 || salary.tdsAmount > 0) ? (
+                        <div>
+                          {salary.pfAmount > 0 && (
+                            <div className="text-xs text-rose-600 font-medium">PF: -{formatCurrency(salary.pfAmount)}</div>
+                          )}
+                          {salary.tdsAmount > 0 && (
+                            <div className="text-xs text-rose-600 font-medium">TDS: -{formatCurrency(salary.tdsAmount)}</div>
+                          )}
+                        </div>
+                      ) : (
+                        <span className="text-xs text-slate-400">None</span>
+                      )}
+                    </td>
+                    <td className="px-6 py-4 text-right">
+                      <div className="font-semibold text-emerald-700">{formatCurrency(salary.amount)}</div>
                       {salary.commission > 0 && (
                         <div className="text-xs text-emerald-600 mt-0.5">+ {formatCurrency(salary.commission)} comm.</div>
                       )}
@@ -263,7 +288,7 @@ const SalariesPage = () => {
               <div className="grid grid-cols-2 gap-4">
                 <div>
                   <label className="block text-sm font-medium text-slate-700 mb-1">Gross Amount (₹)</label>
-                  <input type="number" required min="1" value={formData.amount} onChange={e => setFormData({...formData, amount: e.target.value})} className="input-field" placeholder="0" />
+                  <input type="number" required min="1" value={formData.grossAmount} onChange={e => setFormData({...formData, grossAmount: e.target.value})} className="input-field" placeholder="0" />
                 </div>
                 <div>
                   <label className="block text-sm font-medium text-slate-700 mb-1">Commission (₹)</label>

@@ -3,27 +3,60 @@ const { success, error, paginated } = require('../utils/response');
 
 /**
  * POST /api/finance/requisitions
+ * Includes Budget Overspend Protection:
+ *   - Checks if the requested amount exceeds the vertical's remaining budget
+ *   - Rejects with a clear error if insufficient funds
  */
 const createRequisition = async (req, res) => {
   try {
-    const requisition = await prisma.requisition.create({
-      data: {
-        ...req.body,
-        raisedById: req.user.id,
-      },
-      include: {
-        raisedBy: { select: { id: true, name: true, email: true, vertical: true } },
-      },
+    const { vertical, amount, financialYear } = req.body;
+
+    // ── Budget Overspend Protection ──
+    const budget = await prisma.budget.findUnique({
+      where: { vertical_financialYear: { vertical, financialYear } },
     });
 
-    await prisma.auditLog.create({
-      data: {
-        action: 'CREATE',
-        entity: 'Requisition',
-        entityId: requisition.id,
-        details: JSON.stringify(req.body),
-        performedBy: req.user.id,
-      },
+    if (!budget) {
+      return error(res, `No budget allocation found for ${vertical} in FY ${financialYear}. Contact the Finance Officer to set up a budget.`, 400);
+    }
+
+    const remainingBudget = budget.allocated - budget.used;
+    const utilisationPercent = budget.allocated > 0 ? Math.round((budget.used / budget.allocated) * 100) : 0;
+
+    if (amount > remainingBudget) {
+      return error(res, 
+        `Insufficient budget. ${vertical} has ${new Intl.NumberFormat('en-IN', { style: 'currency', currency: 'INR', maximumFractionDigits: 0 }).format(remainingBudget)} remaining (${utilisationPercent}% utilised). Requested: ${new Intl.NumberFormat('en-IN', { style: 'currency', currency: 'INR', maximumFractionDigits: 0 }).format(amount)}`, 
+        400
+      );
+    }
+
+    // ── Atomic: Create Requisition + Audit Log ──
+    const requisition = await prisma.$transaction(async (tx) => {
+      const req_record = await tx.requisition.create({
+        data: {
+          ...req.body,
+          raisedById: req.user.id,
+        },
+        include: {
+          raisedBy: { select: { id: true, name: true, email: true, vertical: true } },
+        },
+      });
+
+      await tx.auditLog.create({
+        data: {
+          action: 'CREATE',
+          entity: 'Requisition',
+          entityId: req_record.id,
+          details: JSON.stringify({
+            ...req.body,
+            budgetRemaining: remainingBudget,
+            budgetUtilisation: `${utilisationPercent}%`,
+          }),
+          performedBy: req.user.id,
+        },
+      });
+
+      return req_record;
     });
 
     return success(res, requisition, 'Requisition submitted successfully', 201);
@@ -223,7 +256,9 @@ const releaseFunds = async (req, res) => {
     if (!releasedAmount || releasedAmount <= 0) {
       return error(res, 'Released amount must be a positive number', 400);
     }
-    if (releasedAmount > existing.approvedAmount) {
+    const maxAllowed = existing.approvedAmount || existing.amount;
+    
+    if (releasedAmount > maxAllowed) {
       return error(res, 'Released amount cannot exceed the approved amount', 400);
     }
 

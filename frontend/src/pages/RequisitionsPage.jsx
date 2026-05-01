@@ -73,7 +73,7 @@ const RequisitionsPage = () => {
         });
       } else if (modalType === 'RELEASE') {
         await api.patch(`/finance/requisitions/${selectedReq.id}/release`, {
-          releasedAmount: selectedReq.approvedAmount
+          releasedAmount: selectedReq.approvedAmount || selectedReq.amount
         });
       }
       
@@ -336,7 +336,7 @@ const RequisitionsPage = () => {
                     <div className="space-y-4">
                       <div className="bg-blue-50 border border-blue-100 p-4 rounded-xl">
                         <p className="text-sm text-blue-600 font-semibold mb-1">Amount to Release</p>
-                        <p className="text-3xl font-bold text-blue-800">{formatCurrency(selectedReq.approvedAmount)}</p>
+                        <p className="text-3xl font-bold text-blue-800">{formatCurrency(selectedReq.approvedAmount || selectedReq.amount)}</p>
                       </div>
                       <div className="bg-amber-50 p-4 rounded-xl border border-amber-100 text-sm text-amber-800">
                         <strong>Warning:</strong> This will deduct the amount from the {selectedReq.vertical} budget and mark the status as Awaiting Utilisation.
