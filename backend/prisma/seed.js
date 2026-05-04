@@ -185,34 +185,34 @@ async function main() {
     });
   }
 
-  // 500 Donor Funds (Income: 50k - 5L)
+  // 500 Donor Funds (Income: 2L - 10L) -> Massively boosts Revenue
   for (let i = 0; i < 500; i++) {
     transactionsData.push({
       transactionType: 'DONOR_FUND',
       source: 'FUND_RAISING',
-      amount: 50000 + Math.round(Math.random() * 450000),
+      amount: 200000 + Math.round(Math.random() * 800000),
       status: 'SUCCESS',
       createdAt: getRandomDate(),
     });
   }
 
-  // 2,000 Salaries (Expense: 20k - 80k)
-  for (let i = 0; i < 2000; i++) {
+  // 1,000 Salaries (Expense: 20k - 60k) -> Reduced frequency and amount
+  for (let i = 0; i < 1000; i++) {
     transactionsData.push({
       transactionType: 'SALARY',
       source: 'SECRETARIAT',
-      amount: 20000 + Math.round(Math.random() * 60000),
+      amount: 20000 + Math.round(Math.random() * 40000),
       status: 'SUCCESS',
       createdAt: getRandomDate(),
     });
   }
 
-  // 500 Fund Releases (Expense: 1L - 5L)
-  for (let i = 0; i < 500; i++) {
+  // 250 Fund Releases (Expense: 50k - 2L) -> Reduced frequency and amount
+  for (let i = 0; i < 250; i++) {
     transactionsData.push({
       transactionType: 'FUND_RELEASE',
       source: verticals[Math.floor(Math.random() * verticals.length)],
-      amount: 100000 + Math.round(Math.random() * 400000),
+      amount: 50000 + Math.round(Math.random() * 150000),
       status: 'SUCCESS',
       createdAt: getRandomDate(),
     });

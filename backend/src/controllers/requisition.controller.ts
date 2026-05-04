@@ -1,0 +1,359 @@
+import { Request, Response } from 'express';
+import prisma from '../utils/prisma';
+import { success, error, paginated } from '../utils/response';
+
+/**
+ * POST /api/finance/requisitions
+ * Includes Budget Overspend Protection:
+ *   - Checks if the requested amount exceeds the vertical's remaining budget
+ *   - Rejects with a clear error if insufficient funds
+ */
+export const createRequisition = async (req: Request | any, res: Response) => {
+  try {
+    const { vertical, amount, financialYear } = req.body;
+
+    // ── Budget Overspend Protection ──
+    const budget = await prisma.budget.findUnique({
+      where: { vertical_financialYear: { vertical, financialYear } },
+    });
+
+    if (!budget) {
+      return error(res, `No budget allocation found for ${vertical} in FY ${financialYear}. Contact the Finance Officer to set up a budget.`, 400);
+    }
+
+    const remainingBudget = (budget.allocated || 0) - (budget.used || 0);
+    const utilisationPercent = (budget.allocated || 0) > 0 ? Math.round(((budget.used || 0) / (budget.allocated || 1)) * 100) : 0;
+
+    if (amount > remainingBudget) {
+      return error(res, 
+        `Insufficient budget. ${vertical} has ${new Intl.NumberFormat('en-IN', { style: 'currency', currency: 'INR', maximumFractionDigits: 0 }).format(remainingBudget)} remaining (${utilisationPercent}% utilised). Requested: ${new Intl.NumberFormat('en-IN', { style: 'currency', currency: 'INR', maximumFractionDigits: 0 }).format(amount)}`, 
+        400
+      );
+    }
+
+    // ── Atomic: Create Requisition + Audit Log ──
+    const requisition = await prisma.$transaction(async (tx) => {
+      const req_record = await tx.requisition.create({
+        data: {
+          ...req.body,
+          raisedById: req.user.id,
+        },
+        include: {
+          raisedBy: { select: { id: true, name: true, email: true, vertical: true } },
+        },
+      });
+
+      await tx.auditLog.create({
+        data: {
+          action: 'CREATE',
+          entity: 'Requisition',
+          entityId: req_record.id,
+          details: JSON.stringify({
+            ...req.body,
+            budgetRemaining: remainingBudget,
+            budgetUtilisation: `${utilisationPercent}%`,
+          }),
+          performedBy: req.user.id,
+        },
+      });
+
+      return req_record;
+    });
+
+    return success(res, requisition, 'Requisition submitted successfully', 201);
+  } catch (err) {
+    console.error('Create requisition error:', err);
+    return error(res, 'Failed to create requisition');
+  }
+};
+
+/**
+ * GET /api/finance/requisitions
+ */
+export const getRequisitions = async (req: Request | any, res: Response) => {
+  try {
+    const { page = 1, limit = 20, vertical, status, financialYear } = req.query as any;
+    const skip = (parseInt(page) - 1) * parseInt(limit);
+
+    const where: any = {};
+    if (vertical) where.vertical = vertical;
+    if (status) where.status = status;
+    if (financialYear) where.financialYear = financialYear;
+
+    // Vertical users can only see their own requisitions
+    if (req.user.role === 'VERTICAL_USER') {
+      where.raisedById = req.user.id;
+    }
+
+    const [requisitions, total] = await Promise.all([
+      prisma.requisition.findMany({
+        where,
+        include: {
+          raisedBy: { select: { id: true, name: true, email: true, vertical: true } },
+          approvedBy: { select: { id: true, name: true } },
+        },
+        orderBy: { createdAt: 'desc' },
+        skip,
+        take: parseInt(limit),
+      }),
+      prisma.requisition.count({ where }),
+    ]);
+
+    return paginated(res, requisitions, total, page, limit, 'Requisitions retrieved');
+  } catch (err) {
+    console.error('Get requisitions error:', err);
+    return error(res, 'Failed to fetch requisitions');
+  }
+};
+
+/**
+ * GET /api/finance/requisitions/:id
+ */
+export const getRequisition = async (req: Request, res: Response) => {
+  try {
+    const requisition = await prisma.requisition.findUnique({
+      where: { id: req.params.id as string },
+      include: {
+        raisedBy: { select: { id: true, name: true, email: true, vertical: true } },
+        approvedBy: { select: { id: true, name: true } },
+      },
+    });
+
+    if (!requisition) {
+      return error(res, 'Requisition not found', 404);
+    }
+
+    return success(res, requisition);
+  } catch (err) {
+    return error(res, 'Failed to fetch requisition');
+  }
+};
+
+/**
+ * PATCH /api/finance/requisitions/:id/approve
+ * Atomic: Updates requisition status + writes audit log in a single transaction.
+ */
+export const approveRequisition = async (req: Request | any, res: Response) => {
+  try {
+    const { id } = req.params;
+    const existing = await prisma.requisition.findUnique({ where: { id } });
+
+    if (!existing) return error(res, 'Requisition not found', 404);
+    if (existing.status !== 'PENDING') {
+      return error(res, `Cannot approve — current status is ${existing.status}`, 400);
+    }
+
+    const approvedAmount = req.body.approvedAmount || existing.amount;
+
+    if (approvedAmount <= 0) {
+      return error(res, 'Approved amount must be a positive number', 400);
+    }
+    if (approvedAmount > (existing.amount || 0)) {
+      return error(res, 'Approved amount cannot exceed the requested amount', 400);
+    }
+
+    // --- ATOMIC TRANSACTION: Approve + Audit Log ---
+    const requisition = await prisma.$transaction(async (tx) => {
+      const updated = await tx.requisition.update({
+        where: { id },
+        data: {
+          status: 'APPROVED',
+          approvedAmount,
+          approvedById: req.user.id,
+        },
+        include: {
+          raisedBy: { select: { id: true, name: true, vertical: true } },
+          approvedBy: { select: { id: true, name: true } },
+        },
+      });
+
+      await tx.auditLog.create({
+        data: {
+          action: 'APPROVE',
+          entity: 'Requisition',
+          entityId: id,
+          details: JSON.stringify({
+            approvedAmount,
+            requestedAmount: existing.amount,
+            vertical: existing.vertical,
+            financialYear: existing.financialYear,
+          }),
+          performedBy: req.user.id,
+        },
+      });
+
+      return updated;
+    });
+
+    return success(res, requisition, 'Requisition approved successfully');
+  } catch (err) {
+    console.error('Approve requisition error:', err);
+    return error(res, 'Failed to approve requisition');
+  }
+};
+
+/**
+ * PATCH /api/finance/requisitions/:id/reject
+ */
+export const rejectRequisition = async (req: Request | any, res: Response) => {
+  try {
+    const { id } = req.params;
+    const existing = await prisma.requisition.findUnique({ where: { id } });
+
+    if (!existing) return error(res, 'Requisition not found', 404);
+    if (existing.status !== 'PENDING') {
+      return error(res, `Cannot reject — current status is ${existing.status}`, 400);
+    }
+
+    const requisition = await prisma.requisition.update({
+      where: { id },
+      data: {
+        status: 'REJECTED',
+        rejectionNote: req.body.rejectionNote,
+        approvedById: req.user.id,
+      },
+      include: {
+        raisedBy: { select: { id: true, name: true, vertical: true } },
+      },
+    });
+
+    await prisma.auditLog.create({
+      data: {
+        action: 'REJECT',
+        entity: 'Requisition',
+        entityId: id,
+        details: JSON.stringify({ rejectionNote: req.body.rejectionNote }),
+        performedBy: req.user.id,
+      },
+    });
+
+    return success(res, requisition, 'Requisition rejected');
+  } catch (err: any) {
+    console.error('Reject requisition error:', err);
+    return error(res, 'Failed to reject requisition');
+  }
+};
+
+/**
+ * PATCH /api/finance/requisitions/:id/release
+ * ATOMIC TRANSACTION: All 4 operations happen together or none do.
+ *   1. Update Requisition status → UTILISATION_PENDING
+ *   2. Deduct from Vertical Budget (released field)
+ *   3. Create FUND_RELEASE entry in the Transaction ledger
+ *   4. Write to AuditLog
+ */
+export const releaseFunds = async (req: Request | any, res: Response) => {
+  try {
+    const { id } = req.params;
+    const existing = await prisma.requisition.findUnique({ where: { id } });
+
+    if (!existing) return error(res, 'Requisition not found', 404);
+    if (existing.status !== 'APPROVED') {
+      return error(res, 'Funds can only be released for approved requisitions', 400);
+    }
+
+    const releasedAmount = req.body.releasedAmount ?? existing.approvedAmount;
+
+    if (!releasedAmount || releasedAmount <= 0) {
+      return error(res, 'Released amount must be a positive number', 400);
+    }
+    const maxAllowed = existing.approvedAmount || existing.amount || 0;
+    
+    if (releasedAmount > maxAllowed) {
+      return error(res, 'Released amount cannot exceed the approved amount', 400);
+    }
+
+    // --- ATOMIC TRANSACTION: All 4 writes succeed or all rollback ---
+    const requisition = await prisma.$transaction(async (tx) => {
+
+      // 1. Check budget availability INSIDE the transaction to prevent race conditions
+      const budget = await tx.budget.findUnique({
+        where: {
+          vertical_financialYear: {
+            vertical: existing.vertical!,
+            financialYear: existing.financialYear!,
+          },
+        },
+      });
+
+      if (!budget) {
+        throw new Error(`No budget record found for ${existing.vertical} / ${existing.financialYear}. Create a budget allocation first.`);
+      }
+
+      const availableBudget = (budget.allocated || 0) - (budget.released || 0);
+      if (availableBudget < releasedAmount) {
+        throw new Error(
+          `Insufficient budget for ${existing.vertical}. Available: ₹${availableBudget.toLocaleString('en-IN')}, Requested: ₹${releasedAmount.toLocaleString('en-IN')}`
+        );
+      }
+
+      // 2. Update Requisition status
+      const updated = await tx.requisition.update({
+        where: { id },
+        data: {
+          status: 'UTILISATION_PENDING',
+          releasedAmount,
+        },
+        include: {
+          raisedBy: { select: { id: true, name: true, vertical: true } },
+        },
+      });
+
+      // 3. Deduct from the vertical's budget
+      await tx.budget.update({
+        where: {
+          vertical_financialYear: {
+            vertical: existing.vertical!,
+            financialYear: existing.financialYear!,
+          },
+        },
+        data: {
+          released: { increment: releasedAmount },
+          used: { increment: releasedAmount },
+        },
+      });
+
+      // 4. Write to the central Transaction ledger
+      await tx.transaction.create({
+        data: {
+          transactionType: 'FUND_RELEASE',
+          source: existing.vertical!,
+          amount: releasedAmount,
+          description: `Fund release for requisition: ${existing.purpose}`,
+          reference: id,
+          status: 'SUCCESS',
+          userId: req.user.id,
+        },
+      });
+
+      // 5. Write to the AuditLog
+      await tx.auditLog.create({
+        data: {
+          action: 'FUND_RELEASE',
+          entity: 'Requisition',
+          entityId: id,
+          details: JSON.stringify({
+            releasedAmount,
+            approvedAmount: existing.approvedAmount,
+            vertical: existing.vertical,
+            financialYear: existing.financialYear,
+            budgetBefore: { allocated: budget.allocated, released: budget.released, used: budget.used },
+            budgetAfter: { released: (budget.released || 0) + releasedAmount, used: (budget.used || 0) + releasedAmount },
+          }),
+          performedBy: req.user.id,
+        },
+      });
+
+      return updated;
+    });
+
+    return success(res, requisition, 'Funds released successfully — budget deducted and ledger updated');
+  } catch (err: any) {
+    console.error('Release funds error:', err);
+    // Surface the specific business-logic error message from inside the transaction
+    const message = err.message.startsWith('Insufficient') || err.message.startsWith('No budget')
+      ? err.message
+      : 'Failed to release funds';
+    return error(res, message, 400);
+  }
+};

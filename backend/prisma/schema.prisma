@@ -1,6 +1,3 @@
-// ASAP Kerala Finance Module — Database Schema
-// Centralized finance system serving all verticals
-
 generator client {
   provider = "prisma-client-js"
 }
@@ -10,252 +7,1455 @@ datasource db {
   url      = env("DATABASE_URL")
 }
 
-// ─── USERS & AUTH ────────────────────────────────────────────
-
 model User {
-  id        String   @id @default(uuid())
-  name      String
-  email     String   @unique
-  password  String
-  role      String   @default("VERTICAL_USER") // FINANCE_OFFICER, ADMIN, VERTICAL_USER, STUDENT
-  vertical  String?  // Which vertical this user belongs to (null for finance officers)
-  phone     String?
-  active    Boolean  @default(true)
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
+  id                                                                 String                         @id @default(uuid())
+  name                                                               String
+  email                                                              String                         @unique
+  password                                                           String
+  phone                                                              String?
+  role                                                               String                         @default("USER")
+  vertical                                                           String?
+  active                                                             Boolean                        @default(true)
+  createdAt                                                          DateTime                       @default(now()) @map("created_at")
+  updatedAt                                                          DateTime                       @updatedAt @map("updated_at")
+  departmentId                                                       String?                        @map("department_id")
+  isAdmin                                                            Boolean                        @default(false) @map("is_admin")
+  is_active                                                          Boolean?                       @default(true)
+  department_assignees                                               department_assignees[]
+  departments_departments_l1_supervisor_idTousers                    departments[]                  @relation("departments_l1_supervisor_idTousers")
+  departments_departments_l2_dept_head_idTousers                     departments[]                  @relation("departments_l2_dept_head_idTousers")
+  auditLogs                                                          AuditLog[]
+  approvedRequests                                                   Requisition[]                  @relation("ApprovedBy")
+  requisitions                                                       Requisition[]                  @relation("RaisedBy")
+  salaryRecords                                                      Salary[]
+  studentPayments                                                    StudentPayment[]
+  transactions                                                       Transaction[]
+  submittedUtilisations                                              Utilisation[]                  @relation("SubmittedBy")
+  verifiedUtilisations                                               Utilisation[]                  @relation("VerifiedBy")
+  fr_agreements                                                      fr_agreements[]
+  fr_audit_logs                                                      fr_audit_logs[]
+  fr_bulk_email_logs                                                 fr_bulk_email_logs[]
+  fr_companies                                                       fr_companies[]
+  fr_company_visits                                                  fr_company_visits[]
+  fr_documents                                                       fr_documents[]
+  fr_donor_payment_submissions                                       fr_donor_payment_submissions[]
+  fr_donor_portal_access_fr_donor_portal_access_created_byTousers    fr_donor_portal_access[]       @relation("fr_donor_portal_access_created_byTousers")
+  fr_donor_portal_access_fr_donor_portal_access_user_idTousers       fr_donor_portal_access[]       @relation("fr_donor_portal_access_user_idTousers")
+  fr_fund_work_orders_fr_fund_work_orders_created_byTousers          fr_fund_work_orders[]          @relation("fr_fund_work_orders_created_byTousers")
+  fr_fund_work_orders_fr_fund_work_orders_vertical_pm_idTousers      fr_fund_work_orders[]          @relation("fr_fund_work_orders_vertical_pm_idTousers")
+  fr_fwo_progress_updates                                            fr_fwo_progress_updates[]
+  fr_invoices                                                        fr_invoices[]
+  fr_lead_history                                                    fr_lead_history[]
+  fr_notifications                                                   fr_notifications[]
+  fr_payments_fr_payments_created_byTousers                          fr_payments[]                  @relation("fr_payments_created_byTousers")
+  fr_payments_fr_payments_reconciled_byTousers                       fr_payments[]                  @relation("fr_payments_reconciled_byTousers")
+  fr_project_expenditures_fr_project_expenditures_approved_byTousers fr_project_expenditures[]      @relation("fr_project_expenditures_approved_byTousers")
+  fr_project_expenditures_fr_project_expenditures_created_byTousers  fr_project_expenditures[]      @relation("fr_project_expenditures_created_byTousers")
+  fr_proposals                                                       fr_proposals[]
+  fr_refresh_tokens                                                  fr_refresh_tokens[]
+  notifications                                                      notifications[]
+  tbb_batches                                                        tbb_batches[]
+  tick_activity_logs                                                 tick_activity_logs[]
+  tick_attachments                                                   tick_attachments[]
+  tick_comments                                                      tick_comments[]
+  tick_department_assignees                                          tick_department_assignees[]
+  tick_departments_tick_departments_l1_supervisor_idTousers          tick_departments[]             @relation("tick_departments_l1_supervisor_idTousers")
+  tick_departments_tick_departments_l2_dept_head_idTousers           tick_departments[]             @relation("tick_departments_l2_dept_head_idTousers")
+  tick_feedback                                                      tick_feedback[]
+  tick_notifications                                                 tick_notifications[]
+  tick_tickets_tick_tickets_assignee_idTousers                       tick_tickets[]                 @relation("tick_tickets_assignee_idTousers")
+  tick_tickets_tick_tickets_requester_idTousers                      tick_tickets[]                 @relation("tick_tickets_requester_idTousers")
+  tickets_tickets_assignee_idTousers                                 tickets[]                      @relation("tickets_assignee_idTousers")
+  tickets_tickets_requester_idTousers                                tickets[]                      @relation("tickets_requester_idTousers")
+  tick_departments_users_department_idTotick_departments             tick_departments?              @relation("users_department_idTotick_departments", fields: [departmentId], references: [id])
 
-  // Relations
-  transactions     Transaction[]
-  requisitions     Requisition[]     @relation("RaisedBy")
-  approvedRequests Requisition[]     @relation("ApprovedBy")
-  salaryRecords    Salary[]
-  studentPayments  StudentPayment[]
-  auditLogs        AuditLog[]
-  submittedUtilisations Utilisation[] @relation()
-  verifiedUtilisations  Utilisation[] @relation("VerifiedBy")
+  @@map("users")
 }
-
-// ─── TRANSACTIONS ────────────────────────────────────────────
 
 model Transaction {
-  id              String   @id @default(uuid())
-  transactionType String   // STUDENT_PAYMENT, DONOR_FUND, SALARY, EXPENSE, FUND_RELEASE, REFUND
-  source          String   // TRAINING, CSP, SDC, FUND_RAISING, TBB, SECRETARIAT, FINANCE
-  amount          Float
+  id              String    @id @default(uuid())
+  transactionType String?   @map("transaction_type")
+  source          String?
+  amount          Float?
   description     String?
-  reference       String?  // External reference number
-  status          String   @default("SUCCESS") // SUCCESS, FAILED, PENDING
-  userId          String?
-  user            User?    @relation(fields: [userId], references: [id])
-  createdAt       DateTime @default(now())
-  updatedAt       DateTime @updatedAt
+  reference       String?
+  status          String?   @default("SUCCESS")
+  userId          String?   @map("user_id")
+  createdAt       DateTime  @default(now()) @map("created_at")
+  updatedAt       DateTime? @updatedAt @map("updated_at")
+  user            User?     @relation(fields: [userId], references: [id])
 
-  @@index([transactionType])
-  @@index([source])
-  @@index([status])
-  @@index([createdAt])
+  @@map("fin_transactions")
 }
-
-// ─── REQUISITIONS ────────────────────────────────────────────
 
 model Requisition {
-  id            String   @id @default(uuid())
-  vertical      String   // TRAINING, CSP, SDC, FUND_RAISING, TBB, SECRETARIAT
-  amount        Float
-  purpose       String
-  description   String?
-  financialYear String   // e.g. "2025-26"
-  status        String   @default("PENDING") // PENDING, APPROVED, REJECTED, FUNDS_RELEASED
-  rejectionNote String?
-  approvedAmount Float?
-  releasedAmount Float?  // Amount actually released (can be partial)
+  id             String        @id @default(uuid())
+  vertical       String?
+  amount         Float?
+  purpose        String?
+  description    String?
+  financialYear  String?       @map("financial_year")
+  status         String?       @default("PENDING")
+  rejectionNote  String?       @map("rejection_note")
+  approvedAmount Float?        @map("approved_amount")
+  releasedAmount Float?        @map("released_amount")
+  raisedById     String?       @map("raised_by_id")
+  approvedById   String?       @map("approved_by_id")
+  createdAt      DateTime      @default(now()) @map("created_at")
+  updatedAt      DateTime?     @updatedAt @map("updated_at")
+  approvedBy     User?         @relation("ApprovedBy", fields: [approvedById], references: [id])
+  raisedBy       User?         @relation("RaisedBy", fields: [raisedById], references: [id])
+  utilisations   Utilisation[]
 
-  raisedById    String
-  raisedBy      User     @relation("RaisedBy", fields: [raisedById], references: [id])
-  approvedById  String?
-  approvedBy    User?    @relation("ApprovedBy", fields: [approvedById], references: [id])
-
-  createdAt     DateTime @default(now())
-  updatedAt     DateTime @updatedAt
-
-  utilisations  Utilisation[]
-
-  @@index([status])
-  @@index([vertical])
-  @@index([raisedById])
+  @@map("fin_requisitions")
 }
-
-// ─── BUDGET ──────────────────────────────────────────────────
 
 model Budget {
-  id            String   @id @default(uuid())
-  vertical      String   // TRAINING, CSP, SDC, FUND_RAISING, TBB, SECRETARIAT
-  financialYear String   // e.g. "2025-26"
-  allocated     Float    @default(0)
-  used          Float    @default(0)
-  released      Float    @default(0)
+  id            String    @id @default(uuid())
+  vertical      String?
+  financialYear String?   @map("financial_year")
+  allocated     Float?    @default(0)
+  used          Float?    @default(0)
+  released      Float?    @default(0)
   description   String?
-  createdAt     DateTime @default(now())
-  updatedAt     DateTime @updatedAt
+  createdAt     DateTime  @default(now()) @map("created_at")
+  updatedAt     DateTime? @updatedAt @map("updated_at")
 
   @@unique([vertical, financialYear])
+  @@map("fin_budgets")
 }
-
-// ─── SALARIES & PAYOUTS ──────────────────────────────────────
 
 model Salary {
-  id            String   @id @default(uuid())
-  employeeType  String   // EMPLOYEE, TRAINER, MENTOR, AGENT
-  employeeName  String
-  employeeId    String?  // Reference to HR system
-  vertical      String?
-  amount        Float
-  month         String   // e.g. "2026-04"
-  status        String   @default("PENDING") // PENDING, PAID, FAILED
-  paymentDate   DateTime?
-  reference     String?  // Payment reference number
-  commission    Float?   // For agents — per enrolment commission
-  pfAmount      Float    @default(0) // Provident Fund deduction
-  tdsAmount     Float    @default(0) // Tax Deducted at Source
+  id           String    @id @default(uuid())
+  employeeType String?   @map("employee_type")
+  employeeName String?   @map("employee_name")
+  employeeId   String?   @map("employee_id")
+  vertical     String?
+  amount       Float?
+  month        String?
+  status       String?   @default("PENDING")
+  paymentDate  DateTime? @map("payment_date")
+  reference    String?
+  commission   Float?
+  pfAmount     Float?    @default(0) @map("pf_amount")
+  tdsAmount    Float?    @default(0) @map("tds_amount")
+  userId       String?   @map("user_id")
+  createdAt    DateTime  @default(now()) @map("created_at")
+  updatedAt    DateTime? @updatedAt @map("updated_at")
+  user         User?     @relation(fields: [userId], references: [id])
 
-  userId        String?
-  user          User?    @relation(fields: [userId], references: [id])
-
-  createdAt     DateTime @default(now())
-  updatedAt     DateTime @updatedAt
-
-  @@index([status])
-  @@index([month])
-  @@index([vertical])
+  @@map("fin_salaries")
 }
-
-// ─── DONOR FUNDS ─────────────────────────────────────────────
 
 model DonorFund {
-  id          String   @id @default(uuid())
-  donorName   String
-  donorType   String   @default("INDIVIDUAL") // INDIVIDUAL, CORPORATE, GOVERNMENT, SPONSORSHIP
-  amount      Float
-  vertical    String?  // Which vertical this fund is for
-  project     String?  // Specific project name
-  purpose     String?
-  reference   String?  // Receipt / acknowledgement number
-  receivedAt  DateTime @default(now())
-  createdAt   DateTime @default(now())
-  updatedAt   DateTime @updatedAt
-}
+  id         String    @id @default(uuid())
+  donorName  String?   @map("donor_name")
+  donorType  String?   @default("INDIVIDUAL") @map("donor_type")
+  amount     Float?
+  vertical   String?
+  project    String?
+  purpose    String?
+  reference  String?
+  receivedAt DateTime? @default(now()) @map("received_at")
+  createdAt  DateTime  @default(now()) @map("created_at")
+  updatedAt  DateTime? @updatedAt @map("updated_at")
 
-// ─── BANK RECORDS ────────────────────────────────────────────
+  @@map("fin_donor_funds")
+}
 
 model BankRecord {
-  id          String   @id @default(uuid())
-  entryType   String   // STATEMENT, EMD, BANK_GUARANTEE, FD, OTHER
-  bankName    String?
-  accountNo   String?
-  amount      Float
+  id          String    @id @default(uuid())
+  entryType   String?   @map("entry_type")
+  bankName    String?   @map("bank_name")
+  accountNo   String?   @map("account_no")
+  amount      Float?
   description String?
-  reference   String?  // Document / tender reference
-  validFrom   DateTime?
-  validUntil  DateTime?
-  status      String   @default("ACTIVE") // ACTIVE, EXPIRED, RELEASED, FORFEITED
-  createdAt   DateTime @default(now())
-  updatedAt   DateTime @updatedAt
-}
+  reference   String?
+  validFrom   DateTime? @map("valid_from")
+  validUntil  DateTime? @map("valid_until")
+  status      String?   @default("ACTIVE")
+  createdAt   DateTime  @default(now()) @map("created_at")
+  updatedAt   DateTime? @updatedAt @map("updated_at")
 
-// ─── STUDENT PAYMENTS ────────────────────────────────────────
+  @@map("fin_bank_records")
+}
 
 model StudentPayment {
-  id              String   @id @default(uuid())
-  studentId       String
-  student         User     @relation(fields: [studentId], references: [id])
-  courseName      String
-  totalFee        Float
-  paidAmount      Float    @default(0)
-  installmentNo   Int      @default(1)
-  paymentType     String   @default("FEE") // FEE, INSTALLMENT, REFUND
-  status          String   @default("PENDING") // PENDING, PAID, PARTIAL, REFUNDED
-  paidAt          DateTime?
-  reference       String?  // Payment gateway reference
-  createdAt       DateTime @default(now())
-  updatedAt       DateTime @updatedAt
-  refundRequests  RefundRequest[]
+  id             String          @id @default(uuid())
+  studentId      String?         @map("student_id")
+  courseName     String?         @map("course_name")
+  totalFee       Float?          @map("total_fee")
+  paidAmount     Float?          @default(0) @map("paid_amount")
+  installmentNo  Int?            @default(1) @map("installment_no")
+  paymentType    String?         @default("FEE") @map("payment_type")
+  status         String?         @default("PENDING")
+  paidAt         DateTime?       @map("paid_at")
+  reference      String?
+  createdAt      DateTime        @default(now()) @map("created_at")
+  updatedAt      DateTime?       @updatedAt @map("updated_at")
+  refundRequests RefundRequest[]
+  student        User?           @relation(fields: [studentId], references: [id])
 
-  @@index([status])
-  @@index([studentId])
+  @@map("fin_student_payments")
 }
-
-// ─── AUDIT LOG ───────────────────────────────────────────────
 
 model AuditLog {
   id          String   @id @default(uuid())
-  action      String   // CREATE, UPDATE, APPROVE, REJECT, DELETE
-  entity      String   // Transaction, Requisition, Budget, etc.
-  entityId    String
-  details     String?  // JSON string of changes
-  performedBy String
-  user        User     @relation(fields: [performedBy], references: [id])
-  createdAt   DateTime @default(now())
+  action      String?
+  entity      String?
+  entityId    String?  @map("entity_id")
+  details     String?
+  performedBy String?  @map("performed_by")
+  createdAt   DateTime @default(now()) @map("created_at")
+  user        User?    @relation(fields: [performedBy], references: [id])
 
-  @@index([entity, entityId])
-  @@index([performedBy])
+  @@map("fin_audit_logs")
 }
-
-// ─── UTILISATIONS ──────────────────────────────────────────────
 
 model Utilisation {
-  id            String   @id @default(uuid())
-  requisitionId String
-  requisition   Requisition @relation(fields: [requisitionId], references: [id])
-  vertical      String
-  amount        Float
-  description   String
-  billNo        String?
-  proofFileUrl  String?  // S3 URL for uploaded bills/receipts
-  status        String   @default("PENDING") // PENDING, VERIFIED, REJECTED
-  rejectionNote String?
-  
-  submittedById String
-  submittedBy   User     @relation(fields: [submittedById], references: [id])
-  
-  verifiedById  String?
-  verifiedBy    User?    @relation("VerifiedBy", fields: [verifiedById], references: [id])
+  id            String       @id @default(uuid())
+  requisitionId String?      @map("requisition_id")
+  vertical      String?
+  amount        Float?
+  description   String?
+  billNo        String?      @map("bill_no")
+  proofFileUrl  String?      @map("proof_file_url")
+  status        String?      @default("PENDING")
+  rejectionNote String?      @map("rejection_note")
+  submittedById String?      @map("submitted_by_id")
+  verifiedById  String?      @map("verified_by_id")
+  createdAt     DateTime     @default(now()) @map("created_at")
+  updatedAt     DateTime?    @updatedAt @map("updated_at")
+  requisition   Requisition? @relation(fields: [requisitionId], references: [id])
+  submittedBy   User?        @relation("SubmittedBy", fields: [submittedById], references: [id])
+  verifiedBy    User?        @relation("VerifiedBy", fields: [verifiedById], references: [id])
 
-  createdAt     DateTime @default(now())
-  updatedAt     DateTime @updatedAt
+  @@map("fin_utilisations")
 }
-
-// ─── INVOICES ──────────────────────────────────────────────────
 
 model Invoice {
-  id            String   @id @default(uuid())
-  invoiceNumber String   @unique
-  direction     String   @default("OUTBOUND") // INBOUND, OUTBOUND
-  vertical      String   // TRAINING, CSP, SDC, FUND_RAISING, TBB, SECRETARIAT, FINANCE
-  clientName    String   // The client or entity name
-  panGstin      String?  // PAN or GSTIN for taxation tracking
-  baseAmount    Float
-  gstPercent    Int
-  cgstAmount    Float    @default(0)
-  sgstAmount    Float    @default(0)
-  gstAmount     Float
-  tdsPercent    Float    @default(0)
-  totalAmount   Float
-  status        String   @default("DRAFT") // DRAFT, APPROVED, PAID
+  id            String    @id @default(uuid())
+  invoiceNumber String?   @unique @map("invoice_number")
+  direction     String?   @default("OUTBOUND")
+  vertical      String?
+  clientName    String?   @map("client_name")
+  panGstin      String?   @map("pan_gstin")
+  baseAmount    Float?    @map("base_amount")
+  gstPercent    Int?      @map("gst_percent")
+  cgstAmount    Float?    @default(0) @map("cgst_amount")
+  sgstAmount    Float?    @default(0) @map("sgst_amount")
+  gstAmount     Float?    @map("gst_amount")
+  tdsPercent    Float?    @default(0) @map("tds_percent")
+  totalAmount   Float?    @map("total_amount")
+  status        String?   @default("DRAFT")
   description   String?
-  createdAt     DateTime @default(now())
-  updatedAt     DateTime @updatedAt
+  createdAt     DateTime  @default(now()) @map("created_at")
+  updatedAt     DateTime? @updatedAt @map("updated_at")
+
+  @@map("fin_invoices")
 }
 
-// ─── REFUNDS ──────────────────────────────────────────────────
-
 model RefundRequest {
-  id               String   @id @default(uuid())
-  studentPaymentId String
-  studentPayment   StudentPayment @relation(fields: [studentPaymentId], references: [id])
-  refundAmount     Float
-  reason           String
-  status           String   @default("PENDING") // PENDING, APPROVED, REJECTED
-  rejectionNote    String?
-  createdAt        DateTime @default(now())
-  updatedAt        DateTime @updatedAt
+  id               String          @id @default(uuid())
+  studentPaymentId String?         @map("student_payment_id")
+  refundAmount     Float?          @map("refund_amount")
+  reason           String?
+  status           String?         @default("PENDING")
+  rejectionNote    String?         @map("rejection_note")
+  createdAt        DateTime        @default(now()) @map("created_at")
+  updatedAt        DateTime?       @updatedAt @map("updated_at")
+  studentPayment   StudentPayment? @relation(fields: [studentPaymentId], references: [id])
+
+  @@map("fin_refund_requests")
+}
+
+model Sp_Announcement {
+  id        String   @id
+  title     String
+  date      DateTime
+  type      String
+  createdAt DateTime @default(now())
+}
+
+model Sp_Attendance {
+  id          String      @id
+  studentId   String
+  date        DateTime
+  status      String
+  month       String
+  createdAt   DateTime    @default(now())
+  sp_students sp_students @relation(fields: [studentId], references: [id])
+}
+
+model Sp_PlatformUsage {
+  id          String      @id
+  studentId   String
+  label       String
+  value       Int
+  total       Int
+  createdAt   DateTime    @default(now())
+  sp_students sp_students @relation(fields: [studentId], references: [id])
+}
+
+model Sp_StudentToTbb_Batch {
+  A           String
+  B           String
+  sp_students sp_students @relation(fields: [A], references: [id], onDelete: Cascade)
+  tbb_batches tbb_batches @relation(fields: [B], references: [id], onDelete: Cascade)
+
+  @@id([A, B], map: "_Sp_StudentToTbb_Batch_AB_pkey")
+  @@index([B], map: "_Sp_StudentToTbb_Batch_B_index")
+  @@map("_Sp_StudentToTbb_Batch")
+}
+
+model categories {
+  id             String           @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  department_id  String?          @db.Uuid
+  name           String           @db.VarChar(100)
+  created_at     DateTime?        @default(now()) @db.Timestamptz(6)
+  departments    departments?     @relation(fields: [department_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
+  sub_categories sub_categories[]
+  tickets        tickets[]
+}
+
+model department_assignees {
+  id              String          @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  department_id   String?         @db.Uuid
+  user_id         String?
+  sub_category_id String?         @db.Uuid
+  departments     departments?    @relation(fields: [department_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
+  sub_categories  sub_categories? @relation(fields: [sub_category_id], references: [id], onUpdate: NoAction)
+  users           User?           @relation(fields: [user_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
+
+  @@unique([department_id, user_id, sub_category_id], map: "dept_assignees_unique")
+}
+
+model departments {
+  id                                        String                 @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  name                                      String                 @unique @db.VarChar(100)
+  created_at                                DateTime?              @default(now()) @db.Timestamptz(6)
+  l1_supervisor_id                          String?
+  l2_dept_head_id                           String?
+  categories                                categories[]
+  department_assignees                      department_assignees[]
+  users_departments_l1_supervisor_idTousers User?                  @relation("departments_l1_supervisor_idTousers", fields: [l1_supervisor_id], references: [id], onUpdate: NoAction)
+  users_departments_l2_dept_head_idTousers  User?                  @relation("departments_l2_dept_head_idTousers", fields: [l2_dept_head_id], references: [id], onUpdate: NoAction)
+  tickets                                   tickets[]
+}
+
+model fr_agreements {
+  id                  String              @id
+  fwo_id              String
+  donor_id            String
+  agreement_number    String              @unique
+  title               String
+  content             String?
+  version             Int                 @default(1)
+  status              Fr_AgreementStatus  @default(DRAFT)
+  signed_by_donor     Boolean             @default(false)
+  signed_by_asap      Boolean             @default(false)
+  donor_signed_at     DateTime?
+  asap_signed_at      DateTime?
+  file_url            String?
+  valid_from          DateTime?           @db.Date
+  valid_until         DateTime?           @db.Date
+  created_by          String
+  created_at          DateTime            @default(now())
+  updated_at          DateTime
+  users               User                @relation(fields: [created_by], references: [id])
+  fr_donors           fr_donors           @relation(fields: [donor_id], references: [id])
+  fr_fund_work_orders fr_fund_work_orders @relation(fields: [fwo_id], references: [id])
+}
+
+model fr_audit_logs {
+  id         String   @id
+  user_id    String
+  action     String
+  table_name String
+  record_id  String?
+  old_value  Json?
+  new_value  Json?
+  ip_address String?
+  created_at DateTime @default(now())
+  users      User     @relation(fields: [user_id], references: [id])
+}
+
+model fr_bulk_email_logs {
+  id              String   @id
+  sent_by         String
+  subject         String
+  body            String
+  company_ids     String[]
+  recipient_count Int
+  skipped_count   Int      @default(0)
+  status          String   @default("QUEUED")
+  created_at      DateTime @default(now())
+  users           User     @relation(fields: [sent_by], references: [id])
+}
+
+model fr_companies {
+  id                String              @id
+  name              String
+  category          Fr_DonorCategory
+  industry          String?
+  website           String?
+  address           String?
+  city              String?
+  state             String?
+  contact_person    String?
+  contact_email     String?
+  contact_phone     String?
+  csr_budget        Decimal?            @db.Decimal(15, 2)
+  normalized_name   String
+  is_active         Boolean             @default(true)
+  created_by        String
+  created_at        DateTime            @default(now())
+  updated_at        DateTime
+  users             User                @relation(fields: [created_by], references: [id])
+  fr_company_visits fr_company_visits[]
+  fr_donors         fr_donors?
+  fr_lead_history   fr_lead_history[]
+  fr_proposals      fr_proposals[]
+
+  @@unique([normalized_name, city])
+}
+
+model fr_company_visits {
+  id               String                 @id
+  company_id       String
+  pm_user_id       String
+  visit_date       DateTime               @db.Date
+  visit_type       Fr_VisitType
+  proposal_status  Fr_ProposalVisitStatus
+  feedback         String?
+  next_action      String?
+  next_action_date DateTime?              @db.Date
+  geo_latitude     Decimal?               @db.Decimal(9, 6)
+  geo_longitude    Decimal?               @db.Decimal(9, 6)
+  photos           String[]
+  lead_status      Fr_LeadStatus
+  created_at       DateTime               @default(now())
+  updated_at       DateTime
+  fr_companies     fr_companies           @relation(fields: [company_id], references: [id])
+  users            User                   @relation(fields: [pm_user_id], references: [id])
+}
+
+model fr_documents {
+  id                  String               @id
+  entity_type         String
+  entity_id           String
+  proposal_id         String?
+  fwo_id              String?
+  file_name           String
+  file_url            String
+  file_size           Int?
+  mime_type           String?
+  uploaded_by         String
+  version             Int                  @default(1)
+  is_signed           Boolean              @default(false)
+  signed_at           DateTime?
+  created_at          DateTime             @default(now())
+  fr_fund_work_orders fr_fund_work_orders? @relation(fields: [fwo_id], references: [id])
+  fr_proposals        fr_proposals?        @relation(fields: [proposal_id], references: [id])
+  users               User                 @relation(fields: [uploaded_by], references: [id])
+}
+
+model fr_donor_payment_submissions {
+  id               String                     @id
+  invoice_id       String
+  donor_id         String
+  amount_paid      Decimal                    @db.Decimal(15, 2)
+  payment_mode     Fr_PaymentMode
+  transaction_ref  String
+  screenshot_url   String?
+  payment_date     DateTime                   @db.Date
+  status           Fr_PaymentSubmissionStatus @default(PENDING_VERIFICATION)
+  verified_by      String?
+  verified_at      DateTime?
+  rejection_reason String?
+  submitted_at     DateTime                   @default(now())
+  fr_donors        fr_donors                  @relation(fields: [donor_id], references: [id])
+  fr_invoices      fr_invoices                @relation(fields: [invoice_id], references: [id])
+  users            User?                      @relation(fields: [verified_by], references: [id])
+}
+
+model fr_donor_portal_access {
+  id                                             String    @id
+  user_id                                        String
+  donor_id                                       String
+  last_login                                     DateTime?
+  created_by                                     String?
+  created_at                                     DateTime  @default(now())
+  users_fr_donor_portal_access_created_byTousers User?     @relation("fr_donor_portal_access_created_byTousers", fields: [created_by], references: [id])
+  fr_donors                                      fr_donors @relation(fields: [donor_id], references: [id], onDelete: Cascade)
+  users_fr_donor_portal_access_user_idTousers    User      @relation("fr_donor_portal_access_user_idTousers", fields: [user_id], references: [id], onDelete: Cascade)
+
+  @@unique([user_id, donor_id])
+}
+
+model fr_donors {
+  id                           String                         @id
+  company_id                   String                         @unique
+  type                         Fr_DonorCategory
+  pan_number                   String?
+  tan_number                   String?
+  bank_account                 String?
+  ifsc_code                    String?
+  bank_name                    String?
+  account_holder_name          String?
+  total_committed              Decimal                        @default(0) @db.Decimal(15, 2)
+  total_received               Decimal                        @default(0) @db.Decimal(15, 2)
+  is_80g_eligible              Boolean                        @default(false)
+  notes                        String?
+  created_at                   DateTime                       @default(now())
+  updated_at                   DateTime
+  fr_agreements                fr_agreements[]
+  fr_donor_payment_submissions fr_donor_payment_submissions[]
+  fr_donor_portal_access       fr_donor_portal_access[]
+  fr_companies                 fr_companies                   @relation(fields: [company_id], references: [id])
+  fr_fund_work_orders          fr_fund_work_orders[]
+  fr_invoices                  fr_invoices[]
+  fr_payments                  fr_payments[]
+  fr_tax_certificates          fr_tax_certificates[]
+}
+
+model fr_fund_work_orders {
+  id                                              String                    @id
+  fwo_number                                      String                    @unique
+  proposal_id                                     String
+  donor_id                                        String
+  assigned_vertical                               Fr_AssignedVertical
+  vertical_pm_id                                  String
+  title                                           String
+  total_value                                     Decimal                   @db.Decimal(15, 2)
+  status                                          Fr_FWOStatus              @default(CREATED)
+  start_date                                      DateTime                  @db.Date
+  end_date                                        DateTime                  @db.Date
+  completion_pct                                  Int                       @default(0)
+  created_by                                      String
+  created_at                                      DateTime                  @default(now())
+  updated_at                                      DateTime
+  fr_agreements                                   fr_agreements[]
+  fr_documents                                    fr_documents[]
+  users_fr_fund_work_orders_created_byTousers     User                      @relation("fr_fund_work_orders_created_byTousers", fields: [created_by], references: [id])
+  fr_donors                                       fr_donors                 @relation(fields: [donor_id], references: [id])
+  fr_proposals                                    fr_proposals              @relation(fields: [proposal_id], references: [id])
+  users_fr_fund_work_orders_vertical_pm_idTousers User                      @relation("fr_fund_work_orders_vertical_pm_idTousers", fields: [vertical_pm_id], references: [id])
+  fr_fwo_milestones                               fr_fwo_milestones[]
+  fr_fwo_progress_updates                         fr_fwo_progress_updates[]
+  fr_invoices                                     fr_invoices[]
+  fr_payments                                     fr_payments[]
+  fr_project_expenditures                         fr_project_expenditures[]
+  fr_students                                     fr_students[]
+}
+
+model fr_fwo_milestones {
+  id                  String              @id
+  fwo_id              String
+  title               String
+  description         String?
+  due_date            DateTime            @db.Date
+  payment_amount      Decimal             @db.Decimal(15, 2)
+  status              Fr_MilestoneStatus  @default(PENDING)
+  completed_at        DateTime?
+  evidence_urls       String[]
+  created_at          DateTime            @default(now())
+  updated_at          DateTime
+  fr_fund_work_orders fr_fund_work_orders @relation(fields: [fwo_id], references: [id], onDelete: Cascade)
+  fr_invoices         fr_invoices[]
+}
+
+model fr_fwo_progress_updates {
+  id                  String              @id
+  fwo_id              String
+  updated_by          String
+  completion_pct      Int
+  notes               String?
+  expenditure         Decimal?            @db.Decimal(15, 2)
+  attachments         String[]
+  created_at          DateTime            @default(now())
+  fr_fund_work_orders fr_fund_work_orders @relation(fields: [fwo_id], references: [id])
+  users               User                @relation(fields: [updated_by], references: [id])
+}
+
+model fr_invoices {
+  id                           String                         @id
+  invoice_number               String                         @unique
+  fwo_id                       String
+  donor_id                     String
+  milestone_id                 String?
+  invoice_date                 DateTime                       @db.Date
+  due_date                     DateTime?                      @db.Date
+  amount                       Decimal                        @db.Decimal(15, 2)
+  gst_amount                   Decimal                        @default(0) @db.Decimal(15, 2)
+  total_amount                 Decimal                        @db.Decimal(15, 2)
+  status                       Fr_InvoiceStatus               @default(DRAFT)
+  file_url                     String?
+  sent_at                      DateTime?
+  created_by                   String
+  created_at                   DateTime                       @default(now())
+  updated_at                   DateTime
+  fr_donor_payment_submissions fr_donor_payment_submissions[]
+  users                        User                           @relation(fields: [created_by], references: [id])
+  fr_donors                    fr_donors                      @relation(fields: [donor_id], references: [id])
+  fr_fund_work_orders          fr_fund_work_orders            @relation(fields: [fwo_id], references: [id])
+  fr_fwo_milestones            fr_fwo_milestones?             @relation(fields: [milestone_id], references: [id])
+  fr_payments                  fr_payments[]
+}
+
+model fr_lead_history {
+  id           String        @id
+  company_id   String
+  changed_by   String
+  old_status   Fr_LeadStatus
+  new_status   Fr_LeadStatus
+  notes        String?
+  changed_at   DateTime      @default(now())
+  users        User          @relation(fields: [changed_by], references: [id])
+  fr_companies fr_companies  @relation(fields: [company_id], references: [id])
+}
+
+model fr_notifications {
+  id           String    @id
+  recipient_id String
+  type         String
+  template     String
+  subject      String?
+  body         String?
+  status       String    @default("QUEUED")
+  sent_at      DateTime?
+  entity_type  String?
+  entity_id    String?
+  created_at   DateTime  @default(now())
+  users        User      @relation(fields: [recipient_id], references: [id])
+}
+
+model fr_payments {
+  id                                     String                @id
+  invoice_id                             String
+  fwo_id                                 String
+  donor_id                               String
+  amount_received                        Decimal               @db.Decimal(15, 2)
+  payment_date                           DateTime              @db.Date
+  payment_mode                           Fr_PaymentMode
+  transaction_ref                        String?
+  bank_reference                         String?
+  deduction_amount                       Decimal               @default(0) @db.Decimal(15, 2)
+  deduction_reason                       String?
+  net_amount                             Decimal               @db.Decimal(15, 2)
+  reconciled                             Boolean               @default(false)
+  reconciled_by                          String?
+  reconciled_at                          DateTime?
+  notes                                  String?
+  created_by                             String
+  created_at                             DateTime              @default(now())
+  users_fr_payments_created_byTousers    User                  @relation("fr_payments_created_byTousers", fields: [created_by], references: [id])
+  fr_donors                              fr_donors             @relation(fields: [donor_id], references: [id])
+  fr_fund_work_orders                    fr_fund_work_orders   @relation(fields: [fwo_id], references: [id])
+  fr_invoices                            fr_invoices           @relation(fields: [invoice_id], references: [id])
+  users_fr_payments_reconciled_byTousers User?                 @relation("fr_payments_reconciled_byTousers", fields: [reconciled_by], references: [id])
+  fr_tax_certificates                    fr_tax_certificates[]
+}
+
+model fr_project_expenditures {
+  id                                               String              @id
+  fwo_id                                           String
+  cost_head                                        Fr_CostHead
+  amount                                           Decimal             @db.Decimal(15, 2)
+  description                                      String?
+  voucher_number                                   String?
+  expense_date                                     DateTime            @db.Date
+  approved_by                                      String?
+  receipt_url                                      String?
+  created_by                                       String
+  created_at                                       DateTime            @default(now())
+  users_fr_project_expenditures_approved_byTousers User?               @relation("fr_project_expenditures_approved_byTousers", fields: [approved_by], references: [id])
+  users_fr_project_expenditures_created_byTousers  User                @relation("fr_project_expenditures_created_byTousers", fields: [created_by], references: [id])
+  fr_fund_work_orders                              fr_fund_work_orders @relation(fields: [fwo_id], references: [id])
+}
+
+model fr_proposal_cost_heads {
+  id              String       @id
+  proposal_id     String
+  cost_head       Fr_CostHead
+  budgeted_amount Decimal      @db.Decimal(15, 2)
+  description     String?
+  created_at      DateTime     @default(now())
+  fr_proposals    fr_proposals @relation(fields: [proposal_id], references: [id], onDelete: Cascade)
+
+  @@unique([proposal_id, cost_head])
+}
+
+model fr_proposals {
+  id                     String                   @id
+  proposal_number        String                   @unique
+  company_id             String
+  created_by             String
+  title                  String
+  objectives             String?
+  target_beneficiaries   Int?
+  start_date             DateTime?                @db.Date
+  end_date               DateTime?                @db.Date
+  total_budget           Decimal?                 @db.Decimal(15, 2)
+  status                 Fr_ProposalStatus        @default(DRAFT)
+  submitted_at           DateTime?
+  approved_at            DateTime?
+  rejection_reason       String?
+  created_at             DateTime                 @default(now())
+  updated_at             DateTime
+  fr_documents           fr_documents[]
+  fr_fund_work_orders    fr_fund_work_orders[]
+  fr_proposal_cost_heads fr_proposal_cost_heads[]
+  fr_companies           fr_companies             @relation(fields: [company_id], references: [id])
+  users                  User                     @relation(fields: [created_by], references: [id])
+}
+
+model fr_refresh_tokens {
+  id         String   @id
+  user_id    String
+  token      String   @unique
+  expires_at DateTime
+  created_at DateTime @default(now())
+  users      User     @relation(fields: [user_id], references: [id], onDelete: Cascade)
+}
+
+model fr_student_photos {
+  id                String      @id
+  student_id        String
+  photo_url         String
+  geo_latitude      Decimal?    @db.Decimal(9, 6)
+  geo_longitude     Decimal?    @db.Decimal(9, 6)
+  taken_at          DateTime?
+  shared_with_donor Boolean     @default(false)
+  shared_at         DateTime?
+  created_at        DateTime    @default(now())
+  fr_students       fr_students @relation(fields: [student_id], references: [id])
+}
+
+model fr_students {
+  id                  String              @id
+  fr_student_id       String              @unique
+  asap_student_id     String?
+  fwo_id              String
+  name                String
+  email               String
+  phone               String
+  batch_id            String?
+  enrollment_date     DateTime            @db.Date
+  interview_count     Int                 @default(0)
+  is_placed           Boolean             @default(false)
+  placed_at           DateTime?
+  created_at          DateTime            @default(now())
+  fr_student_photos   fr_student_photos[]
+  fr_fund_work_orders fr_fund_work_orders @relation(fields: [fwo_id], references: [id])
+}
+
+model fr_tax_certificates {
+  id                 String             @id
+  donor_id           String
+  payment_id         String
+  certificate_type   Fr_CertificateType
+  certificate_number String             @unique
+  financial_year     String
+  amount             Decimal            @db.Decimal(15, 2)
+  file_url           String?
+  generated_at       DateTime           @default(now())
+  fr_donors          fr_donors          @relation(fields: [donor_id], references: [id])
+  fr_payments        fr_payments        @relation(fields: [payment_id], references: [id])
+}
+
+model notifications {
+  id         String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  user_id    String?
+  ticket_id  String?   @db.Uuid
+  title      String    @db.VarChar(255)
+  message    String
+  is_read    Boolean?  @default(false)
+  created_at DateTime? @default(now()) @db.Timestamptz(6)
+  tickets    tickets?  @relation(fields: [ticket_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
+  users      User?     @relation(fields: [user_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
+
+  @@index([user_id, is_read], map: "idx_notifs_user_read")
+}
+
+model prt_accounts {
+  id               String             @id
+  name             String
+  email            String             @unique
+  password         String
+  role             Prt_Role           @default(PARTNER)
+  status           Prt_Status         @default(PENDING)
+  created_at       DateTime           @default(now())
+  updated_at       DateTime
+  institute_name   String?
+  phone            String?
+  category         String?
+  address          String?
+  gst_number       String?
+  pan_number       String?
+  owner_name       String?
+  coordinator_name String?
+  spoc_email       String?
+  location_url     String?
+  documents        Json?
+  prt_assessments  prt_assessments[]
+  prt_batches      prt_batches[]
+  prt_enrollments  prt_enrollments[]
+  prt_inspections  prt_inspections[]
+  prt_requisitions prt_requisitions[]
+}
+
+model prt_assessments {
+  id             String       @id
+  partner_id     String
+  batch_id       String?
+  course_name    String
+  type           String
+  preferred_date DateTime?
+  preferred_time String?
+  status         String       @default("PENDING")
+  created_at     DateTime     @default(now())
+  prt_accounts   prt_accounts @relation(fields: [partner_id], references: [id])
+}
+
+model prt_batches {
+  id              String            @id
+  name            String
+  course_id       String
+  partner_id      String?
+  status          String            @default("PLANNED")
+  start_date      DateTime?
+  end_date        DateTime?
+  prt_courses     prt_courses       @relation(fields: [course_id], references: [id])
+  prt_accounts    prt_accounts?     @relation(fields: [partner_id], references: [id])
+  prt_enrollments prt_enrollments[]
+}
+
+model prt_courses {
+  id           String        @id
+  title        String        @unique
+  description  String?
+  duration     String?
+  is_published Boolean       @default(false)
+  published_at DateTime?
+  created_at   DateTime      @default(now())
+  updated_at   DateTime
+  prt_batches  prt_batches[]
+}
+
+model prt_enrollments {
+  id           String       @id
+  partner_id   String
+  batch_id     String
+  student_name String
+  status       String       @default("ENROLLED")
+  progress     Int          @default(0)
+  created_at   DateTime     @default(now())
+  prt_batches  prt_batches  @relation(fields: [batch_id], references: [id])
+  prt_accounts prt_accounts @relation(fields: [partner_id], references: [id])
+}
+
+model prt_inspections {
+  id             String       @id
+  partner_id     String
+  type           String
+  preferred_date DateTime?
+  preferred_time String?
+  location       String?
+  inspector      String?
+  status         String       @default("PENDING")
+  created_at     DateTime     @default(now())
+  prt_accounts   prt_accounts @relation(fields: [partner_id], references: [id])
+}
+
+model prt_requisitions {
+  id             String       @id
+  partner_id     String
+  course_name    String
+  batch_size     Int
+  preferred_date DateTime?
+  training_mode  String?
+  requirements   String?
+  status         String       @default("PENDING")
+  created_at     DateTime     @default(now())
+  prt_accounts   prt_accounts @relation(fields: [partner_id], references: [id])
+}
+
+model sla_policies {
+  id                  String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  priority            String?   @unique @db.VarChar(20)
+  response_hours      Int
+  resolution_hours    Int
+  escalation_l1_hours Int
+  escalation_l2_hours Int
+  auto_close_days     Int
+  reopen_window_hours Int?      @default(24)
+  updated_at          DateTime? @default(now()) @db.Timestamptz(6)
+  tickets             tickets[]
+}
+
+model sp_assignment_submissions {
+  id             String         @id
+  student_id     String
+  assignment_id  String
+  file_url       String
+  score          Int?
+  submitted_at   DateTime       @default(now())
+  sp_assignments sp_assignments @relation(fields: [assignment_id], references: [id])
+  sp_students    sp_students    @relation(fields: [student_id], references: [id])
+}
+
+model sp_assignments {
+  id                        String                      @id
+  course_id                 String
+  title                     String
+  due_date                  DateTime?
+  max_marks                 Int                         @default(100)
+  created_at                DateTime                    @default(now())
+  sp_assignment_submissions sp_assignment_submissions[]
+  sp_courses                sp_courses                  @relation(fields: [course_id], references: [id])
+}
+
+model sp_coin_transactions {
+  id          String      @id
+  student_id  String
+  amount      Int
+  activity    String
+  type        String
+  created_at  DateTime    @default(now())
+  sp_students sp_students @relation(fields: [student_id], references: [id])
+}
+
+model sp_courses {
+  id               String             @id
+  title            String
+  duration         String
+  sector           String
+  status           String             @default("Active")
+  created_at       DateTime           @default(now())
+  sp_assignments   sp_assignments[]
+  sp_enrollments   sp_enrollments[]
+  sp_live_classes  sp_live_classes[]
+  tbb_assessments  tbb_assessments[]
+  tbb_batches      tbb_batches[]
+  tbb_certificates tbb_certificates[]
+}
+
+model sp_enrollments {
+  id          String      @id
+  student_id  String
+  course_id   String
+  progress    Int         @default(0)
+  status      String      @default("In Progress")
+  created_at  DateTime    @default(now())
+  sp_courses  sp_courses  @relation(fields: [course_id], references: [id])
+  sp_students sp_students @relation(fields: [student_id], references: [id])
+}
+
+model sp_forum_replies {
+  id               String           @id
+  thread_id        String
+  student_id       String
+  content          String
+  created_at       DateTime         @default(now())
+  sp_students      sp_students      @relation(fields: [student_id], references: [id])
+  sp_forum_threads sp_forum_threads @relation(fields: [thread_id], references: [id])
+}
+
+model sp_forum_threads {
+  id               String             @id
+  author_id        String
+  title            String
+  category         String             @default("General")
+  created_at       DateTime           @default(now())
+  sp_forum_replies sp_forum_replies[]
+  sp_students      sp_students        @relation(fields: [author_id], references: [id])
+}
+
+model sp_job_applications {
+  id                  String              @id
+  student_id          String
+  drive_id            String
+  current_stage       String              @default("Applied")
+  created_at          DateTime            @default(now())
+  sp_placement_drives sp_placement_drives @relation(fields: [drive_id], references: [id])
+  sp_students         sp_students         @relation(fields: [student_id], references: [id])
+}
+
+model sp_live_classes {
+  id           String     @id
+  course_id    String
+  title        String
+  mentor_name  String
+  start_time   DateTime
+  meeting_link String
+  created_at   DateTime   @default(now())
+  sp_courses   sp_courses @relation(fields: [course_id], references: [id])
+}
+
+model sp_placement_drives {
+  id                  String                @id
+  company_name        String
+  role                String
+  status              String                @default("Open")
+  stipend             String?
+  created_at          DateTime              @default(now())
+  sp_job_applications sp_job_applications[]
+}
+
+model sp_students {
+  id                        String                      @id
+  name                      String
+  email                     String                      @unique
+  password                  String
+  phone                     String?
+  aadhaar                   String?                     @unique
+  college                   String?
+  district                  String?
+  totalCoins                Int                         @default(0)
+  membershipTier            String                      @default("Starter")
+  careerReadiness           Int                         @default(0)
+  created_at                DateTime                    @default(now())
+  updated_at                DateTime
+  Sp_Attendance             Sp_Attendance[]
+  Sp_PlatformUsage          Sp_PlatformUsage[]
+  Sp_StudentToTbb_Batch     Sp_StudentToTbb_Batch[]
+  sp_assignment_submissions sp_assignment_submissions[]
+  sp_coin_transactions      sp_coin_transactions[]
+  sp_enrollments            sp_enrollments[]
+  sp_forum_replies          sp_forum_replies[]
+  sp_forum_threads          sp_forum_threads[]
+  sp_job_applications       sp_job_applications[]
+  tbb_assessments           tbb_assessments[]
+  tbb_certificates          tbb_certificates[]
+  tbb_internships           tbb_internships[]
+  tbb_placements            tbb_placements[]
+  tbb_skill_passports       tbb_skill_passports?
+}
+
+model sub_categories {
+  id                   String                 @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  category_id          String?                @db.Uuid
+  name                 String                 @db.VarChar(100)
+  created_at           DateTime?              @default(now()) @db.Timestamptz(6)
+  department_assignees department_assignees[]
+  categories           categories?            @relation(fields: [category_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
+  tickets              tickets[]
+}
+
+model tbb_assessments {
+  id          String      @id
+  studentId   String
+  courseId    String
+  type        String
+  score       Int
+  status      String
+  createdAt   DateTime    @default(now())
+  sp_courses  sp_courses  @relation(fields: [courseId], references: [id])
+  sp_students sp_students @relation(fields: [studentId], references: [id])
+}
+
+model tbb_batches {
+  id                    String                  @id
+  name                  String
+  courseId              String
+  trainerId             String?
+  createdAt             DateTime                @default(now())
+  Sp_StudentToTbb_Batch Sp_StudentToTbb_Batch[]
+  sp_courses            sp_courses              @relation(fields: [courseId], references: [id])
+  users                 User?                   @relation(fields: [trainerId], references: [id])
+  tbb_timetables        tbb_timetables[]
+}
+
+model tbb_certificates {
+  id          String      @id
+  studentId   String
+  courseId    String
+  issueDate   DateTime    @default(now())
+  url         String?
+  createdAt   DateTime    @default(now())
+  sp_courses  sp_courses  @relation(fields: [courseId], references: [id])
+  sp_students sp_students @relation(fields: [studentId], references: [id])
+}
+
+model tbb_events {
+  id          String   @id
+  title       String
+  description String?
+  date        DateTime
+  location    String?
+  type        String
+  createdAt   DateTime @default(now())
+}
+
+model tbb_internships {
+  id          String      @id
+  studentId   String
+  company     String
+  role        String
+  duration    String
+  status      String
+  createdAt   DateTime    @default(now())
+  sp_students sp_students @relation(fields: [studentId], references: [id])
+}
+
+model tbb_placements {
+  id          String      @id
+  studentId   String
+  company     String
+  package     String?
+  joinDate    DateTime?
+  createdAt   DateTime    @default(now())
+  sp_students sp_students @relation(fields: [studentId], references: [id])
+}
+
+model tbb_skill_passports {
+  id          String      @id
+  studentId   String      @unique
+  skills      String[]
+  verified    Boolean     @default(false)
+  createdAt   DateTime    @default(now())
+  sp_students sp_students @relation(fields: [studentId], references: [id])
+}
+
+model tbb_subscription_plans {
+  id        String   @id
+  name      String
+  price     Float
+  duration  String
+  features  String[]
+  createdAt DateTime @default(now())
+}
+
+model tbb_timetables {
+  id          String      @id
+  batchId     String
+  day         String
+  time        String
+  subject     String
+  createdAt   DateTime    @default(now())
+  tbb_batches tbb_batches @relation(fields: [batchId], references: [id])
+}
+
+model tbb_user_approvals {
+  id         String   @id
+  name       String
+  email      String
+  role       String
+  department String?
+  status     String   @default("Pending")
+  createdAt  DateTime @default(now())
+}
+
+model tick_activity_logs {
+  id           String       @id
+  ticket_id    String
+  user_id      String?
+  action       String
+  comment      String?
+  created_at   DateTime     @default(now())
+  tick_tickets tick_tickets @relation(fields: [ticket_id], references: [id], onDelete: Cascade)
+  users        User?        @relation(fields: [user_id], references: [id])
+}
+
+model tick_attachments {
+  id           String       @id
+  ticket_id    String
+  file_name    String
+  file_path    String
+  file_type    String?
+  file_size    Int?
+  uploaded_by  String?
+  created_at   DateTime     @default(now())
+  tick_tickets tick_tickets @relation(fields: [ticket_id], references: [id], onDelete: Cascade)
+  users        User?        @relation(fields: [uploaded_by], references: [id])
+}
+
+model tick_categories {
+  id                  String                @id
+  department_id       String
+  name                String
+  created_at          DateTime              @default(now())
+  tick_departments    tick_departments      @relation(fields: [department_id], references: [id], onDelete: Cascade)
+  tick_sub_categories tick_sub_categories[]
+  tick_tickets        tick_tickets[]
+}
+
+model tick_comments {
+  id           String       @id
+  ticket_id    String
+  user_id      String?
+  comment      String
+  created_at   DateTime     @default(now())
+  tick_tickets tick_tickets @relation(fields: [ticket_id], references: [id], onDelete: Cascade)
+  users        User?        @relation(fields: [user_id], references: [id])
+}
+
+model tick_department_assignees {
+  id                  String               @id
+  department_id       String
+  user_id             String
+  sub_category_id     String?
+  tick_departments    tick_departments     @relation(fields: [department_id], references: [id], onDelete: Cascade)
+  tick_sub_categories tick_sub_categories? @relation(fields: [sub_category_id], references: [id])
+  users               User                 @relation(fields: [user_id], references: [id], onDelete: Cascade)
+
+  @@unique([department_id, user_id, sub_category_id])
+}
+
+model tick_departments {
+  id                                             String                      @id
+  name                                           String                      @unique
+  created_at                                     DateTime                    @default(now())
+  l1_supervisor_id                               String?
+  l2_dept_head_id                                String?
+  tick_categories                                tick_categories[]
+  tick_department_assignees                      tick_department_assignees[]
+  users_tick_departments_l1_supervisor_idTousers User?                       @relation("tick_departments_l1_supervisor_idTousers", fields: [l1_supervisor_id], references: [id])
+  users_tick_departments_l2_dept_head_idTousers  User?                       @relation("tick_departments_l2_dept_head_idTousers", fields: [l2_dept_head_id], references: [id])
+  tick_tickets                                   tick_tickets[]
+  users_users_department_idTotick_departments    User[]                      @relation("users_department_idTotick_departments")
+}
+
+model tick_feedback {
+  id           String       @id
+  ticket_id    String       @unique
+  requester_id String?
+  rating       Int
+  comment      String?
+  created_at   DateTime     @default(now())
+  users        User?        @relation(fields: [requester_id], references: [id])
+  tick_tickets tick_tickets @relation(fields: [ticket_id], references: [id], onDelete: Cascade)
+}
+
+model tick_notifications {
+  id           String        @id
+  user_id      String
+  ticket_id    String?
+  title        String
+  message      String
+  is_read      Boolean       @default(false)
+  created_at   DateTime      @default(now())
+  tick_tickets tick_tickets? @relation(fields: [ticket_id], references: [id], onDelete: Cascade)
+  users        User          @relation(fields: [user_id], references: [id], onDelete: Cascade)
+}
+
+model tick_sla_policies {
+  id                  String         @id
+  priority            String         @unique
+  response_hours      Int
+  resolution_hours    Int
+  escalation_l1_hours Int
+  escalation_l2_hours Int
+  auto_close_days     Int
+  reopen_allowed_days Int
+  updated_at          DateTime       @default(now())
+  tick_tickets        tick_tickets[]
+}
+
+model tick_sub_categories {
+  id                        String                      @id
+  category_id               String
+  name                      String
+  created_at                DateTime                    @default(now())
+  tick_department_assignees tick_department_assignees[]
+  tick_categories           tick_categories             @relation(fields: [category_id], references: [id], onDelete: Cascade)
+  tick_tickets              tick_tickets[]
+}
+
+model tick_tickets {
+  id                                     String               @id
+  ticket_code                            String               @unique
+  type                                   String
+  subject                                String
+  description                            String
+  status                                 String               @default("OPEN")
+  priority                               String
+  department_id                          String?
+  category_id                            String?
+  sub_category_id                        String?
+  requester_id                           String?
+  assignee_id                            String?
+  escalated_l1                           Boolean              @default(false)
+  escalated_l2                           Boolean              @default(false)
+  created_at                             DateTime             @default(now())
+  updated_at                             DateTime
+  resolved_at                            DateTime?
+  closed_at                              DateTime?
+  last_requestor_action_at               DateTime             @default(now())
+  tick_activity_logs                     tick_activity_logs[]
+  tick_attachments                       tick_attachments[]
+  tick_comments                          tick_comments[]
+  tick_feedback                          tick_feedback?
+  tick_notifications                     tick_notifications[]
+  users_tick_tickets_assignee_idTousers  User?                @relation("tick_tickets_assignee_idTousers", fields: [assignee_id], references: [id])
+  tick_categories                        tick_categories?     @relation(fields: [category_id], references: [id])
+  tick_departments                       tick_departments?    @relation(fields: [department_id], references: [id])
+  tick_sla_policies                      tick_sla_policies    @relation(fields: [priority], references: [priority])
+  users_tick_tickets_requester_idTousers User?                @relation("tick_tickets_requester_idTousers", fields: [requester_id], references: [id])
+  tick_sub_categories                    tick_sub_categories? @relation(fields: [sub_category_id], references: [id])
+}
+
+model tickets {
+  id                                String          @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  ticket_code                       String          @unique @db.VarChar(50)
+  type                              String?         @db.VarChar(20)
+  subject                           String          @db.VarChar(255)
+  description                       String
+  department_id                     String?         @db.Uuid
+  category_id                       String?         @db.Uuid
+  sub_category_id                   String?         @db.Uuid
+  priority                          String?         @db.VarChar(20)
+  status                            String?         @default("OPEN") @db.VarChar(30)
+  requester_id                      String?
+  assignee_id                       String?
+  escalated_l1                      Boolean?        @default(false)
+  escalated_l2                      Boolean?        @default(false)
+  created_at                        DateTime?       @default(now()) @db.Timestamptz(6)
+  updated_at                        DateTime?       @default(now()) @db.Timestamptz(6)
+  resolved_at                       DateTime?       @db.Timestamptz(6)
+  closed_at                         DateTime?       @db.Timestamptz(6)
+  last_requestor_action_at          DateTime?       @default(now()) @db.Timestamptz(6)
+  requester_email                   String?         @db.VarChar(255)
+  requester_phone                   String?         @db.VarChar(20)
+  notifications                     notifications[]
+  users_tickets_assignee_idTousers  User?           @relation("tickets_assignee_idTousers", fields: [assignee_id], references: [id], onUpdate: NoAction)
+  categories                        categories?     @relation(fields: [category_id], references: [id], onUpdate: NoAction)
+  departments                       departments?    @relation(fields: [department_id], references: [id], onUpdate: NoAction)
+  sla_policies                      sla_policies?   @relation(fields: [priority], references: [priority], onDelete: NoAction, onUpdate: NoAction)
+  users_tickets_requester_idTousers User?           @relation("tickets_requester_idTousers", fields: [requester_id], references: [id], onUpdate: NoAction)
+  sub_categories                    sub_categories? @relation(fields: [sub_category_id], references: [id], onUpdate: NoAction)
+
+  @@index([assignee_id], map: "idx_tickets_assignee_id")
+  @@index([department_id], map: "idx_tickets_department_id")
+  @@index([priority], map: "idx_tickets_priority")
+  @@index([requester_id], map: "idx_tickets_requester_id")
+  @@index([status], map: "idx_tickets_status")
+  @@index([ticket_code], map: "idx_tickets_ticket_code")
+}
+
+enum Fr_AgreementStatus {
+  DRAFT
+  UNDER_REVIEW
+  SIGNED
+  EXPIRED
+  TERMINATED
+}
+
+enum Fr_AssignedVertical {
+  TRAINING
+  CSP
+  TBB
+  SDA
+  SDC
+  FINANCE
+  LEGAL
+  PR
+}
+
+enum Fr_CertificateType {
+  CERT_80G
+  CERT_12A
+  OTHER
+}
+
+enum Fr_CostHead {
+  MC
+  SC
+  TPC
+  TC
+  AC
+  MSC
+  OVC
+}
+
+enum Fr_DonorCategory {
+  CSR
+  GOVERNMENT
+  LSGD
+  DIRECTORATE
+  HNI
+}
+
+enum Fr_FWOStatus {
+  CREATED
+  IN_PROGRESS
+  ON_HOLD
+  COMPLETED
+  CANCELLED
+}
+
+enum Fr_InvoiceStatus {
+  DRAFT
+  SENT
+  PARTIALLY_PAID
+  PAID
+  OVERDUE
+  CANCELLED
+}
+
+enum Fr_LeadStatus {
+  COLD
+  MEDIUM
+  HOT
+  CLOSED
+}
+
+enum Fr_MilestoneStatus {
+  PENDING
+  IN_PROGRESS
+  COMPLETED
+  OVERDUE
+}
+
+enum Fr_PaymentMode {
+  NEFT
+  RTGS
+  CHEQUE
+  UPI
+  CASH
+  OTHER
+}
+
+enum Fr_PaymentSubmissionStatus {
+  PENDING_VERIFICATION
+  VERIFIED
+  REJECTED
+}
+
+enum Fr_ProposalStatus {
+  DRAFT
+  SUBMITTED
+  UNDER_REVIEW
+  APPROVED
+  REJECTED
+  WITHDRAWN
+}
+
+enum Fr_ProposalVisitStatus {
+  NOT_PRESENTED
+  PRESENTED
+  UNDER_REVIEW
+  ACCEPTED
+  REJECTED
+}
+
+enum Fr_VisitType {
+  IN_PERSON
+  VIRTUAL
+  PHONE
+}
+
+enum Prt_Role {
+  PARTNER
+  STUDENT
+  TEACHER
+}
+
+enum Prt_Status {
+  PENDING
+  ACTIVE
+  REJECTED
+  AUDIT_ROUND_1
+  PHYSICAL_VERIFICATION
 }
