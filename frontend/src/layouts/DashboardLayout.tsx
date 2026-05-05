@@ -15,8 +15,11 @@ import {
   RefreshCcw,
   Receipt,
   ShieldCheck,
+  Wallet,
+  Bell,
   LucideIcon
 } from 'lucide-react';
+import api from '../api/axios';
 
 interface SidebarItemProps {
   to: string;
@@ -47,6 +50,25 @@ const SidebarItem: React.FC<SidebarItemProps> = ({ to, icon: Icon, label }) => (
 const DashboardLayout: React.FC = () => {
   const { user, logout } = useAuth();
   const navigate = useNavigate();
+  const [pendingCount, setPendingCount] = React.useState(0);
+  const [showNotifs, setShowNotifs] = React.useState(false);
+
+  const fetchPendingCount = async () => {
+    if (user?.role === 'FINANCE_OFFICER') {
+      try {
+        const res = await api.get('/finance/invoices/requests/count');
+        setPendingCount(res.data.data.count);
+      } catch (err) {
+        console.error('Failed to fetch notifications', err);
+      }
+    }
+  };
+
+  React.useEffect(() => {
+    fetchPendingCount();
+    const interval = setInterval(fetchPendingCount, 60000); // Poll every minute
+    return () => clearInterval(interval);
+  }, [user]);
 
   const handleLogout = () => {
     logout();
@@ -88,6 +110,7 @@ const DashboardLayout: React.FC = () => {
           <SidebarItem to="/fee-collections" icon={GraduationCap} label="Fee Collections" />
           <SidebarItem to="/refunds" icon={RefreshCcw} label="Refunds" />
           <SidebarItem to="/salaries" icon={Users} label="Salaries & Payouts" />
+          <SidebarItem to="/petty-cash" icon={Wallet} label="Cash & Arrears" />
           <SidebarItem to="/taxation" icon={ShieldCheck} label="Taxation & Compliance" />
           <SidebarItem to="/donors" icon={HeartHandshake} label="Donor Fund Management" />
           <SidebarItem to="/bank" icon={Landmark} label="Bank Records" />
@@ -107,6 +130,37 @@ const DashboardLayout: React.FC = () => {
 
       {/* Main Content */}
       <main className="flex-1 flex flex-col overflow-hidden relative">
+        {/* Top Header */}
+        <header className="h-16 bg-white border-b border-gray-100 flex items-center justify-between px-8 shrink-0">
+          <div className="flex items-center">
+            <h1 className="text-lg font-bold text-slate-800">ASAP Kerala Finance</h1>
+          </div>
+          
+          <div className="flex items-center space-x-6">
+            {user?.role === 'FINANCE_OFFICER' && (
+              <button 
+                onClick={() => navigate('/invoices?tab=requests')}
+                className="relative p-2 text-gray-500 hover:text-blue-600 hover:bg-blue-50 rounded-full transition-all"
+                title="Invoice Requests"
+              >
+                <Bell className="w-5 h-5" />
+                {pendingCount > 0 && (
+                  <span className="absolute top-0 right-0 block h-4 w-4 rounded-full bg-red-500 text-[10px] font-bold text-white flex items-center justify-center border-2 border-white shadow-sm animate-pulse">
+                    {pendingCount}
+                  </span>
+                )}
+              </button>
+            )}
+            
+            <div className="flex items-center space-x-3 pl-6 border-l border-gray-100">
+              <div className="text-right hidden sm:block">
+                <div className="text-xs font-bold text-slate-700">{user.name}</div>
+                <div className="text-[10px] text-slate-400 uppercase tracking-tight">{user.role.replace('_', ' ')}</div>
+              </div>
+            </div>
+          </div>
+        </header>
+
         <div className="flex-1 overflow-auto p-6 md:p-8">
           <Outlet />
         </div>

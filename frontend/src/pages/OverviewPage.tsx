@@ -4,6 +4,7 @@ import { useAuth } from '../context/AuthContext';
 import api from '../api/axios';
 import DatePicker from 'react-datepicker';
 import 'react-datepicker/dist/react-datepicker.css';
+import { useOverviewData } from '../hooks/queries';
 import { 
   IndianRupee, TrendingUp, TrendingDown, Clock, 
   Landmark, FileText, FileCheck, AlertCircle, Activity, Download, 
@@ -151,30 +152,24 @@ interface OverviewData {
 const OverviewPage: React.FC = () => {
   const { user } = useAuth();
   const navigate = useNavigate();
-  const [data, setData] = useState<OverviewData | null>(null);
-  const [loading, setLoading] = useState(true);
+  const [financialYear, setFinancialYear] = useState('all');
   const [dateRange, setDateRange] = useState<[Date | null, Date | null]>([null, null]);
   const [startDate, endDate] = dateRange;
 
-  useEffect(() => {
-    const fetchOverview = async () => {
-      try {
-        setLoading(true);
-        const params: any = {};
-        if (startDate && endDate) {
-          params.startDate = startDate.toISOString();
-          params.endDate = endDate.toISOString();
-        }
-        const response = await api.get('/finance/reports/overview', { params });
-        setData(response.data.data);
-      } catch (error) {
-        console.error('Failed to fetch overview data', error);
-      } finally {
-        setLoading(false);
-      }
-    };
-    fetchOverview();
-  }, [startDate, endDate]);
+  const handleFinancialYearChange = (fy: string) => {
+    setFinancialYear(fy);
+    if (fy === 'all') {
+      setDateRange([null, null]);
+    } else if (fy === '2026-27') {
+      setDateRange([new Date('2026-04-01T00:00:00.000Z'), new Date('2027-03-31T23:59:59.999Z')]);
+    } else if (fy === '2025-26') {
+      setDateRange([new Date('2025-04-01T00:00:00.000Z'), new Date('2026-03-31T23:59:59.999Z')]);
+    } else if (fy === '2024-25') {
+      setDateRange([new Date('2024-04-01T00:00:00.000Z'), new Date('2025-03-31T23:59:59.999Z')]);
+    }
+  };
+
+  const { data, isLoading: loading, isError } = useOverviewData(startDate, endDate);
 
   const formatCurrency = (amount: number) => {
     return new Intl.NumberFormat('en-IN', {
@@ -221,16 +216,16 @@ const OverviewPage: React.FC = () => {
         <div className="flex gap-3 z-10">
           <div className="bg-white border border-slate-200 px-3 py-1.5 rounded-lg text-sm font-semibold text-slate-600 shadow-sm flex items-center hover:bg-slate-50 transition-colors">
             <Clock className="w-4 h-4 mr-2 text-slate-400 shrink-0" />
-            <DatePicker
-              selectsRange={true}
-              startDate={startDate}
-              endDate={endDate}
-              onChange={(update: [Date | null, Date | null]) => setDateRange(update)}
-              isClearable={true}
-              placeholderText="Filter by Date Range"
+            <select
+              value={financialYear}
+              onChange={(e) => handleFinancialYearChange(e.target.value)}
               className="bg-transparent border-none focus:outline-none w-48 text-sm font-semibold cursor-pointer text-slate-700 placeholder:text-slate-400"
-              dateFormat="MMM d, yyyy"
-            />
+            >
+              <option value="all">All Time</option>
+              <option value="2026-27">FY 2026-27</option>
+              <option value="2025-26">FY 2025-26</option>
+              <option value="2024-25">FY 2024-25</option>
+            </select>
           </div>
         </div>
       </div>

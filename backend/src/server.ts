@@ -24,6 +24,7 @@ import utilisationRoutes from './routes/utilisation.routes';
 import invoiceRoutes from './routes/invoice.routes';
 import refundRoutes from './routes/refund.routes';
 import uploadRoutes from './routes/upload.routes';
+import pettycashRoutes from './routes/pettycash.routes';
 
 const app = express();
 
@@ -58,6 +59,7 @@ app.use('/api/upload', uploadRoutes);
 app.use('/api/auth', authRoutes);
 app.use('/api/finance/transactions', transactionRoutes);
 app.use('/api/finance/requisitions', requisitionRoutes);
+app.use('/api/finance/petty-cash', pettycashRoutes);
 app.use('/api/finance/budget', budgetRoutes);
 app.use('/api/finance/salaries', salaryRoutes);
 app.use('/api/finance/donors', donorRoutes);

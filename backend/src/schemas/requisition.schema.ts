@@ -11,6 +11,7 @@ export const createRequisitionSchema = z.object({
   financialYear: z
     .string()
     .regex(/^\d{4}-\d{2}$/, 'Financial year format must be YYYY-YY (e.g., 2025-26)'),
+  documentUrl: z.string().url('Invalid document URL').optional(),
 });
 
 export const approveRequisitionSchema = z.object({

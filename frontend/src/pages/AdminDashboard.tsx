@@ -1,5 +1,5 @@
-import React, { useEffect, useState } from 'react';
-import api from '../api/axios';
+import React, { useState } from 'react';
+import { useOverviewData } from '../hooks/queries';
 import { 
   BarChart3, 
   ShieldCheck, 
@@ -57,22 +57,7 @@ interface AdminData {
 }
 
 const AdminDashboard: React.FC = () => {
-  const [data, setData] = useState<AdminData | null>(null);
-  const [loading, setLoading] = useState(true);
-
-  useEffect(() => {
-    const fetchAdminData = async () => {
-      try {
-        const response = await api.get('/finance/reports/overview');
-        setData(response.data.data);
-      } catch (error) {
-        console.error('Failed to fetch admin dashboard data', error);
-      } finally {
-        setLoading(false);
-      }
-    };
-    fetchAdminData();
-  }, []);
+  const { data, isLoading: loading, isError } = useOverviewData(null, null);
 
   const formatCurrency = (amount: number) => {
     return new Intl.NumberFormat('en-IN', {

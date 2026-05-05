@@ -37,6 +37,8 @@ export const createInvoiceSchema = z.object({
   gstPercent: z.number().int().min(0).max(28, 'GST cannot exceed 28%'),
   tdsPercent: z.number().min(0).max(30, 'TDS cannot exceed 30%').default(0),
   panGstin: panGstinValidator,
+  direction: z.enum(['INBOUND', 'OUTBOUND']).optional(),
+  invoiceNumber: z.string().optional(),
   description: z.string().optional(),
 });
 
@@ -44,4 +46,14 @@ export const updateInvoiceStatusSchema = z.object({
   status: z.enum(['DRAFT', 'APPROVED', 'PAID'], {
     message: 'Status must be DRAFT, APPROVED, or PAID',
   }),
+});
+
+export const createInvoiceRequestSchema = z.object({
+  vertical: z.enum([...config.VERTICALS] as [string, ...string[]]),
+  clientName: z.string().min(2, 'Client name must be at least 2 characters'),
+  amount: z.number().positive('Amount must be greater than 0'),
+  description: z.string().optional(),
+  direction: z.enum(['INBOUND', 'OUTBOUND']).default('OUTBOUND'),
+  category: z.string().optional(),
+  attachmentUrl: z.string().url().optional().or(z.literal('')),
 });

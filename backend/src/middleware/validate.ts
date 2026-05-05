@@ -34,8 +34,10 @@ export const validate = (schema: ZodSchema) => {
 export const validateQuery = (schema: ZodSchema) => {
   return (req: Request, res: Response, next: NextFunction) => {
     try {
+      console.log("Validating query on backend:", req.query);
       const result = schema.safeParse(req.query);
       if (!result.success) {
+        console.error("Query Validation Error:", result.error.issues);
         const formattedErrors = result.error.issues.map((issue) => ({
           field: issue.path.join('.'),
           message: issue.message,

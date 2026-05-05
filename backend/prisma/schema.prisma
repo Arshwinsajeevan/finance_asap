@@ -27,11 +27,14 @@ model User {
   auditLogs                                                          AuditLog[]
   approvedRequests                                                   Requisition[]                  @relation("ApprovedBy")
   requisitions                                                       Requisition[]                  @relation("RaisedBy")
+  invoiceRequests                                                    InvoiceRequest[]               @relation("UserInvoiceRequests")
   salaryRecords                                                      Salary[]
   studentPayments                                                    StudentPayment[]
   transactions                                                       Transaction[]
   submittedUtilisations                                              Utilisation[]                  @relation("SubmittedBy")
   verifiedUtilisations                                               Utilisation[]                  @relation("VerifiedBy")
+  submittedPettyCashVouchers                                         PettyCashVoucher[]             @relation("PettyCashSubmittedBy")
+  verifiedPettyCashVouchers                                          PettyCashVoucher[]             @relation("PettyCashVerifiedBy")
   fr_agreements                                                      fr_agreements[]
   fr_audit_logs                                                      fr_audit_logs[]
   fr_bulk_email_logs                                                 fr_bulk_email_logs[]
@@ -101,6 +104,7 @@ model Requisition {
   releasedAmount Float?        @map("released_amount")
   raisedById     String?       @map("raised_by_id")
   approvedById   String?       @map("approved_by_id")
+  documentUrl    String?       @map("document_url")
   createdAt      DateTime      @default(now()) @map("created_at")
   updatedAt      DateTime?     @updatedAt @map("updated_at")
   approvedBy     User?         @relation("ApprovedBy", fields: [approvedById], references: [id])
@@ -250,9 +254,31 @@ model Invoice {
   status        String?   @default("DRAFT")
   description   String?
   createdAt     DateTime  @default(now()) @map("created_at")
-  updatedAt     DateTime? @updatedAt @map("updated_at")
+  updatedAt      DateTime?       @updatedAt @map("updated_at")
+  invoiceRequest InvoiceRequest?
 
   @@map("fin_invoices")
+}
+
+model InvoiceRequest {
+  id            String    @id @default(uuid())
+  vertical      String
+  clientName    String    @map("client_name")
+  amount        Float
+  description   String?
+  requestedById String    @map("requested_by_id")
+  status        String    @default("PENDING") // PENDING, PROCESSED, CANCELLED
+  direction     String    @default("OUTBOUND") // INBOUND, OUTBOUND
+  category      String?   @default("GENERAL")  // SALARY_CLAIM, VENDOR_BILL, SERVICE_INVOICE, etc.
+  attachmentUrl String?   @map("attachment_url")
+  invoiceId     String?   @unique @map("invoice_id")
+  createdAt     DateTime  @default(now()) @map("created_at")
+  updatedAt     DateTime? @updatedAt @map("updated_at")
+
+  requestedBy   User      @relation("UserInvoiceRequests", fields: [requestedById], references: [id])
+  invoice       Invoice?  @relation(fields: [invoiceId], references: [id])
+
+  @@map("fin_invoice_requests")
 }
 
 model RefundRequest {
@@ -1458,4 +1484,38 @@ enum Prt_Status {
   REJECTED
   AUDIT_ROUND_1
   PHYSICAL_VERIFICATION
+}
+
+model PettyCashAccount {
+  id                String             @id @default(uuid())
+  vertical          String             @unique
+  balance           Float              @default(0)
+  allottedAmount    Float              @default(0) @map("allotted_amount")
+  lastReplenishedAt DateTime?          @map("last_replenished_at")
+  createdAt         DateTime           @default(now()) @map("created_at")
+  updatedAt         DateTime?          @updatedAt @map("updated_at")
+  vouchers          PettyCashVoucher[]
+
+  @@map("fin_petty_cash_accounts")
+}
+
+model PettyCashVoucher {
+  id             String           @id @default(uuid())
+  accountId      String           @map("account_id")
+  amount         Float
+  purpose        String
+  date           DateTime         @default(now())
+  documentUrl    String?          @map("document_url")
+  status         String           @default("PENDING")
+  rejectionNote  String?          @map("rejection_note")
+  submittedById  String           @map("submitted_by_id")
+  verifiedById   String?          @map("verified_by_id")
+  createdAt      DateTime         @default(now()) @map("created_at")
+  updatedAt      DateTime?        @updatedAt @map("updated_at")
+
+  account        PettyCashAccount @relation(fields: [accountId], references: [id])
+  submittedBy    User             @relation("PettyCashSubmittedBy", fields: [submittedById], references: [id])
+  verifiedBy     User?            @relation("PettyCashVerifiedBy", fields: [verifiedById], references: [id])
+
+  @@map("fin_petty_cash_vouchers")
 }

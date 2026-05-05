@@ -36,6 +36,7 @@ const TransactionsPage: React.FC = () => {
   // Filters
   const [typeFilter, setTypeFilter] = useState('');
   const [sourceFilter, setSourceFilter] = useState('');
+  const [searchQuery, setSearchQuery] = useState('');
 
   const fetchTransactions = async () => {
     try {
@@ -43,6 +44,7 @@ const TransactionsPage: React.FC = () => {
       const queryParams = new URLSearchParams();
       if (typeFilter) queryParams.append('type', typeFilter);
       if (sourceFilter) queryParams.append('source', sourceFilter);
+      if (searchQuery) queryParams.append('search', searchQuery);
       
       const [txRes, summaryRes] = await Promise.all([
         api.get(`/finance/transactions?${queryParams.toString()}`),
@@ -51,16 +53,21 @@ const TransactionsPage: React.FC = () => {
       
       setTransactions(txRes.data.data);
       setSummary(summaryRes.data.data);
-    } catch (err) {
-      console.error(err);
+    } catch (err: any) {
+      console.error('Fetch Transactions Error:', err);
+      alert('Failed to load transactions: ' + (err.response?.data?.message || err.message));
     } finally {
       setLoading(false);
     }
   };
 
   useEffect(() => {
-    fetchTransactions();
-  }, [typeFilter, sourceFilter]);
+    const delayDebounceFn = setTimeout(() => {
+      fetchTransactions();
+    }, 500);
+
+    return () => clearTimeout(delayDebounceFn);
+  }, [typeFilter, sourceFilter, searchQuery]);
 
 
   const handleExportCSV = () => {
@@ -148,6 +155,8 @@ const TransactionsPage: React.FC = () => {
               <Search className="w-4 h-4 absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
               <input 
                 type="text" 
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
                 placeholder="Search description or reference..." 
                 className="w-full pl-9 pr-4 py-2 border border-slate-200 rounded-md text-sm focus:outline-none focus:border-primary-500 focus:ring-1 focus:ring-primary-500"
               />

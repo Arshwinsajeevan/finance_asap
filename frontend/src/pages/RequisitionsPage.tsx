@@ -15,6 +15,7 @@ interface Requisition {
   financialYear: string;
   createdAt: string;
   rejectionNote?: string;
+  documentUrl?: string;
   raisedBy: {
     id: string;
     name: string;
@@ -247,7 +248,9 @@ const RequisitionsPage: React.FC = () => {
       {/* Action Modals */}
       {showModal && selectedReq && (
         <div className="fixed inset-0 bg-slate-900/50 flex items-center justify-center z-50 backdrop-blur-sm animate-in fade-in duration-200">
-          <div className="bg-white rounded-2xl shadow-2xl w-full max-w-lg overflow-hidden animate-in zoom-in-95 duration-200">
+          <div className={`bg-white rounded-2xl shadow-2xl w-full overflow-hidden animate-in zoom-in-95 duration-200 ${
+            modalType === 'DETAILS' ? 'max-w-2xl' : 'max-w-lg'
+          }`}>
             
             <div className={`px-6 py-4 border-b flex justify-between items-center ${
               modalType === 'APPROVE' ? 'bg-emerald-50 border-emerald-100' : 
@@ -269,7 +272,7 @@ const RequisitionsPage: React.FC = () => {
             
             <div className="p-6">
               {modalType === 'DETAILS' ? (
-                <div className="space-y-6">
+                <div className="space-y-6 max-h-[75vh] overflow-y-auto">
                   <div className="grid grid-cols-2 gap-4">
                     <div className="bg-slate-50 p-3 rounded-lg border border-slate-100">
                       <p className="text-xs text-slate-500 uppercase font-semibold">Vertical</p>
@@ -297,6 +300,30 @@ const RequisitionsPage: React.FC = () => {
                       <p className="text-lg font-bold text-primary-600">{selectedReq.approvedAmount ? formatCurrency(selectedReq.approvedAmount) : '-'}</p>
                     </div>
                   </div>
+
+                  {/* Sanction Document Viewer */}
+                  {selectedReq.documentUrl && (
+                    <div className="pt-4 border-t border-slate-100">
+                      <h4 className="text-xs text-slate-500 uppercase font-semibold mb-2">Sanction Document / Request Paper</h4>
+                      <div className="aspect-video bg-slate-50 border border-slate-200 rounded-lg overflow-hidden flex flex-col items-center justify-center relative">
+                        <iframe 
+                          src={selectedReq.documentUrl} 
+                          className="w-full h-full border-none min-h-[220px]"
+                          title="Sanction Document"
+                        />
+                        <div className="absolute bottom-2 right-2 flex gap-2">
+                          <a 
+                            href={selectedReq.documentUrl} 
+                            target="_blank" 
+                            rel="noreferrer"
+                            className="bg-white hover:bg-slate-50 border border-slate-200 px-3 py-1.5 rounded-lg text-xs font-semibold text-slate-600 shadow-sm flex items-center transition-colors"
+                          >
+                            Open in New Tab
+                          </a>
+                        </div>
+                      </div>
+                    </div>
+                  )}
 
                   {/* Timeline */}
                   <div className="pt-4 border-t border-slate-100">

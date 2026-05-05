@@ -76,6 +76,8 @@ const BankRecordsPage: React.FC = () => {
   const getStatusColor = (status: string) => {
     switch(status) {
       case 'ACTIVE': return 'bg-emerald-50 text-emerald-700 border-emerald-200';
+      case 'AUDITED': return 'bg-emerald-50 text-emerald-700 border-emerald-200';
+      case 'PROVISIONAL': return 'bg-amber-50 text-amber-700 border-amber-200';
       case 'EXPIRED': return 'bg-red-50 text-red-700 border-red-200';
       case 'RELEASED': return 'bg-blue-50 text-blue-700 border-blue-200';
       case 'FORFEITED': return 'bg-amber-50 text-amber-700 border-amber-200';
@@ -90,6 +92,9 @@ const BankRecordsPage: React.FC = () => {
   const pettyCashTotal = records.filter(r => r.entryType === 'PETTY_CASH').reduce((s, r) => s + (r.amount || 0), 0);
   const imprestTotal = records.filter(r => r.entryType === 'IMPREST').reduce((s, r) => s + (r.amount || 0), 0);
   const arrearsTotal = records.filter(r => r.entryType === 'ARREARS').reduce((s, r) => s + (r.amount || 0), 0);
+  
+  const turnoverRecords = records.filter(r => r.entryType === 'ANNUAL_TURNOVER').sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
+  const latestTurnover = turnoverRecords.length > 0 ? turnoverRecords[0] : null;
 
   return (
     <div className="space-y-6 animate-in fade-in slide-in-from-bottom-4 duration-500">
@@ -105,7 +110,15 @@ const BankRecordsPage: React.FC = () => {
         )}
       </div>
 
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-2">
+      <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-2">
+        <div className="card-premium p-4 flex items-center border-l-4 border-l-indigo-500 bg-indigo-50/50">
+          <div className="p-3 bg-indigo-100 text-indigo-600 rounded-xl mr-4"><FileText className="w-5 h-5" /></div>
+          <div>
+            <p className="text-[10px] font-bold text-indigo-700 uppercase tracking-wider">Latest Turnover</p>
+            <h3 className="text-lg font-black text-indigo-900">{latestTurnover ? formatCurrency(latestTurnover.amount) : 'N/A'}</h3>
+            {latestTurnover && <p className="text-[10px] text-indigo-600 font-semibold">{latestTurnover.reference}</p>}
+          </div>
+        </div>
         <div className="card-premium p-4 flex items-center">
           <div className="p-3 bg-blue-100 text-blue-600 rounded-xl mr-4"><Landmark className="w-5 h-5" /></div>
           <div>
@@ -156,7 +169,7 @@ const BankRecordsPage: React.FC = () => {
       <div className="card-premium">
         <div className="px-6 py-4 border-b border-slate-100 bg-slate-50/50 rounded-t-xl">
           <div className="flex space-x-2 overflow-x-auto pb-2">
-            {['ALL', 'EMD', 'BANK_GUARANTEE', 'FD', 'STATEMENT', 'PETTY_CASH', 'IMPREST', 'ARREARS'].map(type => (
+            {['ALL', 'EMD', 'BANK_GUARANTEE', 'FD', 'STATEMENT', 'PETTY_CASH', 'IMPREST', 'ARREARS', 'ANNUAL_TURNOVER'].map(type => (
               <button
                 key={type}
                 onClick={() => setActiveTab(type)}
@@ -237,7 +250,17 @@ const BankRecordsPage: React.FC = () => {
               <div className="grid grid-cols-2 gap-4">
                 <div>
                   <label className="block text-sm font-medium text-slate-700 mb-1">Entry Type</label>
-                  <select value={formData.entryType} onChange={e => setFormData({...formData, entryType: e.target.value})} className="input-field">
+                  <select 
+                    value={formData.entryType} 
+                    onChange={e => {
+                      const newType = e.target.value;
+                      let newStatus = formData.status;
+                      if (newType === 'ANNUAL_TURNOVER') newStatus = 'AUDITED';
+                      else if (['AUDITED', 'PROVISIONAL'].includes(formData.status)) newStatus = 'ACTIVE';
+                      setFormData({...formData, entryType: newType, status: newStatus});
+                    }} 
+                    className="input-field"
+                  >
                     <option value="EMD">EMD</option>
                     <option value="BANK_GUARANTEE">Bank Guarantee</option>
                     <option value="FD">Fixed Deposit</option>
@@ -245,15 +268,25 @@ const BankRecordsPage: React.FC = () => {
                     <option value="IMPREST">Imprest</option>
                     <option value="ARREARS">Arrears</option>
                     <option value="STATEMENT">Statement</option>
+                    <option value="ANNUAL_TURNOVER">Annual Turnover</option>
                   </select>
                 </div>
                 <div>
                   <label className="block text-sm font-medium text-slate-700 mb-1">Status</label>
                   <select value={formData.status} onChange={e => setFormData({...formData, status: e.target.value})} className="input-field">
-                    <option value="ACTIVE">Active</option>
-                    <option value="EXPIRED">Expired</option>
-                    <option value="RELEASED">Released</option>
-                    <option value="FORFEITED">Forfeited</option>
+                    {formData.entryType === 'ANNUAL_TURNOVER' ? (
+                      <>
+                        <option value="AUDITED">Audited</option>
+                        <option value="PROVISIONAL">Provisional</option>
+                      </>
+                    ) : (
+                      <>
+                        <option value="ACTIVE">Active</option>
+                        <option value="EXPIRED">Expired</option>
+                        <option value="RELEASED">Released</option>
+                        <option value="FORFEITED">Forfeited</option>
+                      </>
+                    )}
                   </select>
                 </div>
               </div>
@@ -274,7 +307,7 @@ const BankRecordsPage: React.FC = () => {
               <div className="grid grid-cols-2 gap-4">
                 <div>
                   <label className="block text-sm font-medium text-slate-700 mb-1">Reference</label>
-                  <input type="text" value={formData.reference} onChange={e => setFormData({...formData, reference: e.target.value})} className="input-field" placeholder="e.g. BG-2025-01" />
+                  <input type="text" value={formData.reference} onChange={e => setFormData({...formData, reference: e.target.value})} className="input-field" placeholder={formData.entryType === 'ANNUAL_TURNOVER' ? 'e.g. FY 2023-24' : 'e.g. BG-2025-01'} />
                 </div>
                 <div>
                   <label className="block text-sm font-medium text-slate-700 mb-1">Valid Until</label>

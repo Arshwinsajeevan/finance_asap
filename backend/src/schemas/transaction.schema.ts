@@ -7,6 +7,7 @@ export const transactionQuerySchema = z.object({
   type: z.enum([...config.TRANSACTION_TYPES, 'FEE_COLLECTION', 'INVOICE_PAYMENT'] as [string, ...string[]]).optional(),
   source: z.enum([...config.VERTICALS, 'FINANCE'] as [string, ...string[]]).optional(),
   status: z.enum(['SUCCESS', 'FAILED', 'PENDING']).optional(),
+  search: z.string().optional(),
   from: z.string().optional(),
   to: z.string().optional(),
 });

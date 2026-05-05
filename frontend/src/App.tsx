@@ -17,6 +17,7 @@ import RefundsPage from './pages/RefundsPage';
 import UtilisationPage from './pages/UtilisationPage';
 import InvoicesPage from './pages/InvoicesPage';
 import TaxationPage from './pages/TaxationPage';
+import PettyCashPage from './pages/PettyCashPage';
 
 interface PrivateRouteProps {
   children: React.ReactNode;
@@ -60,6 +61,7 @@ const AppRoutes: React.FC = () => {
         <Route path="refunds" element={<RefundsPage />} />
         <Route path="invoices" element={<InvoicesPage />} />
         <Route path="taxation" element={<TaxationPage />} />
+        <Route path="petty-cash" element={<PettyCashPage />} />
         <Route path="reports" element={<ReportsPage />} />
       </Route>
 
@@ -68,13 +70,28 @@ const AppRoutes: React.FC = () => {
   );
 };
 
+import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
+import { ReactQueryDevtools } from '@tanstack/react-query-devtools';
+
+const queryClient = new QueryClient({
+  defaultOptions: {
+    queries: {
+      refetchOnWindowFocus: false,
+      retry: 1,
+    },
+  },
+});
+
 const App: React.FC = () => {
   return (
-    <AuthProvider>
-      <BrowserRouter>
-        <AppRoutes />
-      </BrowserRouter>
-    </AuthProvider>
+    <QueryClientProvider client={queryClient}>
+      <AuthProvider>
+        <BrowserRouter>
+          <AppRoutes />
+        </BrowserRouter>
+      </AuthProvider>
+      <ReactQueryDevtools initialIsOpen={false} />
+    </QueryClientProvider>
   );
 }
 

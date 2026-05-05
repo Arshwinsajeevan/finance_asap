@@ -14,13 +14,19 @@ import { success, error, paginated } from '../utils/response';
  */
 export const getTransactions = async (req: Request, res: Response) => {
   try {
-    const { page = 1, limit = 20, type, source, status, from, to } = req.query as any;
+    const { page = 1, limit = 20, type, source, status, search, from, to } = req.query as any;
     const skip = (parseInt(page) - 1) * parseInt(limit);
 
     const where: any = {};
     if (type) where.transactionType = type;
     if (source) where.source = source;
     if (status) where.status = status;
+    if (search) {
+      where.OR = [
+        { description: { contains: search, mode: 'insensitive' } },
+        { reference: { contains: search, mode: 'insensitive' } }
+      ];
+    }
     if (from || to) {
       where.createdAt = {};
       if (from) where.createdAt.gte = new Date(from);
